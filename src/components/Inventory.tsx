@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { InventoryItem, StaffProfile } from '../types';
 import { Plus, Search, Filter, Edit2, Trash2, CheckCircle2, UserCheck, X, RefreshCw, AlertTriangle, HelpCircle, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface InventoryProps {
   inventory: InventoryItem[];
@@ -17,6 +18,9 @@ export default function Inventory({
   onUpdateInventory,
   onDeleteInventory
 }: InventoryProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
@@ -150,6 +154,45 @@ export default function Inventory({
     });
   };
 
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      // Expecting standard JSON array from worksheet
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      // Basic mapping: Maps excel column names to `Omit<InventoryItem, 'id'>`
+      jsonData.forEach((row) => {
+        if (!row.name && !row.Nama) return; // Basic validation
+        
+        const newItem: Omit<InventoryItem, 'id'> = {
+          name: row.name || row.Nama || 'Tanpa Nama',
+          category: row.category || row.Kategori || 'Lainnya',
+          status: row.status || row.Status || 'Tersedia',
+          condition: row.condition || row.Kondisi || 'Baik',
+          purchaseDate: row.purchaseDate || row.Tanggal || new Date().toISOString().split('T')[0],
+          price: Number(row.price || row.Harga || 0)
+        };
+        onAddInventory(newItem);
+      });
+      // Need a way to show success
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      console.error("Failed parsing Excel file", error);
+      alert("Gagal memproses file Excel: " + (error as Error).message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header section with Actions */}
@@ -163,11 +206,22 @@ export default function Inventory({
 
         <div className="flex items-center space-x-3">
           <button 
-            className="relative overflow-hidden group bg-white border border-emerald-200 text-emerald-700 hover:text-emerald-800 font-bold text-xs px-4 py-2 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center space-x-2 uppercase"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            className="relative overflow-hidden group bg-white border border-emerald-200 text-emerald-700 hover:text-emerald-800 disabled:opacity-50 font-bold text-xs px-4 py-2 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center space-x-2 uppercase"
           >
             <div className="absolute inset-0 bg-emerald-50/50 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
-            <FileSpreadsheet className="w-4 h-4 relative z-10" />
-            <span className="relative z-10 tracking-wider">Import Excel</span>
+            {isImporting ? <RefreshCw className="w-4 h-4 relative z-10 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 relative z-10" />}
+            <span className="relative z-10 tracking-wider">
+              {isImporting ? 'Mengimpor...' : 'Import Excel'}
+            </span>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".xlsx,.xls,.csv" 
+              onChange={handleImportExcel} 
+            />
           </button>
           <button 
             onClick={handleOpenAdd}

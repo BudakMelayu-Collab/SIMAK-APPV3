@@ -19,28 +19,11 @@ import DocumentArchiveView from "./components/Archive";
 import Login from "./components/Login";
 
 // Importing Icons
-import {
-  LayoutDashboard,
-  Package,
-  Users,
-  CalendarDays,
-  FileBox,
-  ChevronLeft,
-  ChevronRight,
-  Menu,
-  X,
-  User,
-  Bell,
-  Building2,
-  Clock,
-  ArrowUpRight,
-  LogOut,
-  ShieldCheck,
-  Crown,
-} from "lucide-react";
+import { LayoutDashboard, Package, Users, CalendarDays, FileBox, ChevronLeft, ChevronRight, Menu, X, User as UserIcon, Bell, Building2, Clock, ArrowUpRight, LogOut, ShieldCheck, Crown } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { collection, onSnapshot, setDoc, updateDoc, deleteDoc, doc, writeBatch, getDocFromServer } from "firebase/firestore";
-import { db } from "./firebase";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { db, auth } from "./firebase";
 import { handleFirestoreError, OperationType } from "./firestoreUtils";
 
 async function testConnection() {
@@ -56,6 +39,20 @@ testConnection();
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        setCurrentUser(user);
+      } else {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
   // Navigation active tab State
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] =
@@ -361,8 +358,8 @@ export default function App() {
         {/* Sidebar Footer Details */}
         {!isSidebarCollapsed && (
           <div className="p-5 border-t border-slate-100/50 text-[11px] text-slate-400 space-y-1.5 bg-slate-50/30">
-            <span className="font-mono font-medium block">
-              User: muhammad.nawa
+            <span className="font-mono font-medium block truncate">
+              User: {currentUser?.email || "Unknown"}
             </span>
             <span className="block font-mono font-medium">
               Domain: admin.simak.baznas.go.id
@@ -496,7 +493,7 @@ export default function App() {
               >
                 <div className="text-right hidden sm:block">
                   <span className="text-[14px] font-bold text-slate-800 block leading-none group-hover:text-blue-600 transition-colors">
-                    M. Nawa
+                    {currentUser?.displayName || "Admin"}
                   </span>
                   <div className="flex items-center justify-end space-x-1 mt-1 text-amber-500">
                     <ShieldCheck className="w-3 h-3" />
@@ -508,7 +505,7 @@ export default function App() {
                 <div className="relative">
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden shadow-lg shadow-blue-500/10 ring-2 ring-white group-hover:ring-blue-500/30 transition-all bg-gradient-to-br from-blue-50 to-indigo-50">
                     <img
-                      src="https://i.pravatar.cc/150?u=muhammad.nawa"
+                      src={currentUser?.photoURL || "https://i.pravatar.cc/150"}
                       alt="Admin Profile"
                       className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-500"
                     />
@@ -543,14 +540,14 @@ export default function App() {
                         <div className="flex items-center space-x-3 relative z-10">
                           <div className="w-12 h-12 rounded-xl overflow-hidden ring-2 ring-white/20">
                             <img
-                              src="https://i.pravatar.cc/150?u=muhammad.nawa"
+                              src={currentUser?.photoURL || "https://i.pravatar.cc/150"}
                               alt="Admin Profile"
                               className="w-full h-full object-cover"
                             />
                           </div>
                           <div>
                             <span className="font-bold text-sm block">
-                              Muhammad Nawa
+                              {currentUser?.displayName || "Admin"}
                             </span>
                             <span className="text-[10px] text-blue-300 font-mono tracking-widest uppercase">
                               Pusat Otoritas
@@ -561,8 +558,9 @@ export default function App() {
 
                       <div className="p-2">
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             setIsProfileDropdownOpen(false);
+                            await signOut(auth);
                             setIsAuthenticated(false);
                           }}
                           className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-red-600 text-sm font-semibold transition-colors group"
