@@ -57,14 +57,13 @@ service cloud.firestore {
     // Collection: inventory
     // ----------------------------------------------------
     function isValidInventory(data) {
-      return data.keys().hasAll(['name', 'code', 'category', 'quantity', 'status', 'location', 'purchaseDate']) &&
-             data.name is string && data.name.size() <= 150 &&
-             data.code is string && data.code.size() <= 50 &&
-             data.category is string && data.category.size() <= 50 &&
+      return data.name is string &&
+             data.code is string &&
+             data.category is string &&
              data.quantity is number &&
-             data.status is string && ((data.status == 'Tersedia') || (data.status == 'Digunakan') || (data.status == 'Rusak') || (data.status == 'Dalam Perbaikan')) &&
-             data.location is string && data.location.size() <= 100 &&
-             data.purchaseDate is string && data.purchaseDate.size() <= 30;
+             data.status is string &&
+             data.location is string &&
+             data.purchaseDate is string;
     }
 
     match /inventory/{inventoryId} {

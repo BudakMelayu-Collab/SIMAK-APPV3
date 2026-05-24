@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   HelpCircle,
   FileSpreadsheet,
+  Download,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -190,6 +191,29 @@ export default function Inventory({
     });
   };
 
+  const handleDownloadTemplate = () => {
+    // Generate template data
+    const templateData = [
+      {
+        Nama: "Laptop Asus Vivobook",
+        JenisAset: "Elektronik",
+        Merk: "Asus",
+        Kode: "INV-1001",
+        Kategori: "IT",
+        Jumlah: 10,
+        Harga: 15000000,
+        Status: "Tersedia",
+        Lokasi: "Gudang Utama",
+        Tanggal: "2024-05-20",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    XLSX.writeFile(workbook, "Template_Inventaris.xlsx");
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -197,7 +221,7 @@ export default function Inventory({
     setIsImporting(true);
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = XLSX.read(data, { type: "array", cellDates: true });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       // Expecting standard JSON array from worksheet
@@ -206,45 +230,79 @@ export default function Inventory({
       let successCount = 0;
       // Basic mapping: Maps excel column names to `Omit<InventoryItem, 'id'>`
       const promises = jsonData.map(async (row) => {
-        // More robust key matching by checking keys dynamically if needed, 
+        // More robust key matching by checking keys dynamically if needed,
         // but let's check common casing:
         const name = row.name || row.Nama || row.nama || row.NAME || row.Name;
         if (!name) return; // Skip empty rows
 
+        let dateStr = new Date().toISOString().split("T")[0];
+        const rawDate = row.purchaseDate || row.Tanggal || row.tanggal;
+        if (rawDate instanceof Date) {
+          dateStr = rawDate.toISOString().split("T")[0];
+        } else if (typeof rawDate === "string" && rawDate.trim() !== "") {
+          dateStr = rawDate.split("T")[0]; // basic safety
+        } else if (typeof rawDate === "number") {
+          dateStr = String(rawDate);
+        }
+
+        const conditionVal = row.condition || row.Kondisi || row.kondisi;
+        let statusVal = String(row.status || row.Status || "Tersedia").trim();
+        const validStatuses = [
+          "Tersedia",
+          "Digunakan",
+          "Rusak",
+          "Dalam Perbaikan",
+        ];
+        if (!validStatuses.includes(statusVal)) {
+          statusVal = "Tersedia";
+        }
+
+        let qty = parseInt(row.quantity || row.Jumlah || row.jumlah, 10);
+        if (isNaN(qty)) qty = 1;
+
+        let price = Number(
+          row.unitPrice || row.price || row.Harga || row.harga,
+        );
+        if (isNaN(price)) price = 0;
+
         const newItem: Omit<InventoryItem, "id"> = {
-          assetType: row.assetType || row.JenisAset || row.Jenis || row.jenis || "",
-          name: name || "Tanpa Nama",
-          brand: row.brand || row.Merk || row.merk || "",
-          code:
+          assetType: String(
+            row.assetType || row.JenisAset || row.Jenis || row.jenis || "",
+          ),
+          name: String(name || "Tanpa Nama"),
+          brand: String(row.brand || row.Merk || row.merk || ""),
+          code: String(
             row.code ||
-            row.Kode ||
-            row.kode ||
-            `INV-${Math.floor(100 + Math.random() * 9000)}`,
-          category: row.category || row.Kategori || row.kategori || "Lainnya",
-          quantity: Number(row.quantity || row.Jumlah || row.jumlah || 1),
-          unitPrice: Number(row.unitPrice || row.price || row.Harga || row.harga || 0),
-          status: (row.status || row.Status || "Tersedia") as any,
-          location: row.location || row.Lokasi || row.lokasi || "Gudang",
-          purchaseDate:
-            row.purchaseDate ||
-            row.Tanggal || row.tanggal ||
-            new Date().toISOString().split("T")[0],
+              row.Kode ||
+              row.kode ||
+              `INV-${Math.floor(100 + Math.random() * 9000)}`,
+          ),
+          category: String(
+            row.category || row.Kategori || row.kategori || "Lainnya",
+          ),
+          quantity: qty,
+          unitPrice: price,
+          status: statusVal as any,
+          location: String(
+            row.location || row.Lokasi || row.lokasi || "Gudang",
+          ).trim(),
+          purchaseDate: dateStr.trim(),
         };
+        // Add condition if schema requires it optionally or something, wait condition wasn't there before
         await onAddInventory(newItem);
         successCount++;
       });
-      
+
       await Promise.all(promises);
 
-      // Need a way to show success
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
       alert(`Berhasil mengimpor ${successCount} data dari Excel!`);
     } catch (error) {
       console.error("Failed parsing Excel file", error);
       alert("Gagal memproses file Excel: " + (error as Error).message);
     } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       setIsImporting(false);
     }
   };
@@ -261,6 +319,14 @@ export default function Inventory({
         </div>
 
         <div className="flex items-center space-x-3">
+          <button
+            onClick={handleDownloadTemplate}
+            className="relative overflow-hidden group bg-white border border-blue-200 text-blue-700 hover:text-blue-800 font-bold text-xs px-4 py-2 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center space-x-2 uppercase"
+          >
+            <div className="absolute inset-0 bg-blue-50/50 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
+            <Download className="w-4 h-4 relative z-10" />
+            <span className="relative z-10 tracking-wider">Template</span>
+          </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
@@ -409,7 +475,9 @@ export default function Inventory({
                       {item.location}
                     </td>
                     <td className="text-center text-[11px] text-slate-600">
-                      {item.purchaseDate.substring(0, 4)}
+                      {item.purchaseDate
+                        ? String(item.purchaseDate).substring(0, 4)
+                        : "-"}
                     </td>
                     <td className="text-right">
                       <div className="inline-flex items-center space-x-1">
