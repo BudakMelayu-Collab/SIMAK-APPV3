@@ -1,12 +1,25 @@
-import React, { useState, useRef } from 'react';
-import { InventoryItem, StaffProfile } from '../types';
-import { Plus, Search, Filter, Edit2, Trash2, CheckCircle2, UserCheck, X, RefreshCw, AlertTriangle, HelpCircle, FileSpreadsheet } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import React, { useState, useRef } from "react";
+import { InventoryItem, StaffProfile } from "../types";
+import {
+  Plus,
+  Search,
+  Filter,
+  Edit2,
+  Trash2,
+  CheckCircle2,
+  UserCheck,
+  X,
+  RefreshCw,
+  AlertTriangle,
+  HelpCircle,
+  FileSpreadsheet,
+} from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface InventoryProps {
   inventory: InventoryItem[];
   staff: StaffProfile[];
-  onAddInventory: (item: Omit<InventoryItem, 'id'>) => void;
+  onAddInventory: (item: Omit<InventoryItem, "id">) => void;
   onUpdateInventory: (item: InventoryItem) => void;
   onDeleteInventory: (id: string) => void;
 }
@@ -16,15 +29,15 @@ export default function Inventory({
   staff,
   onAddInventory,
   onUpdateInventory,
-  onDeleteInventory
+  onDeleteInventory,
 }: InventoryProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
 
   // Filters & Search
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Semua');
-  const [selectedStatus, setSelectedStatus] = useState('Semua');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Semua");
+  const [selectedStatus, setSelectedStatus] = useState("Semua");
 
   // Modal States
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -34,49 +47,72 @@ export default function Inventory({
   // Form States
   const [currentItem, setCurrentItem] = useState<InventoryItem | null>(null);
   const [formData, setFormData] = useState({
-    assetType: '',
-    name: '',
-    brand: '',
-    code: '',
-    category: 'Elektronik',
+    assetType: "",
+    name: "",
+    brand: "",
+    code: "",
+    category: "Elektronik",
     quantity: 1,
     unitPrice: 0,
-    status: 'Tersedia' as const,
-    location: '',
-    purchaseDate: new Date().toISOString().split('T')[0]
+    status: "Tersedia" as const,
+    location: "",
+    purchaseDate: new Date().toISOString().split("T")[0],
   });
 
-  const [assigneeId, setAssigneeId] = useState('');
+  const [assigneeId, setAssigneeId] = useState("");
 
   // Dropdown options
-  const categories = ['Semua', 'Elektronik', 'Furnitur', 'Perangkat Jaringan', 'Alat Tulis Kantor', 'Lainnya'];
-  const formCategories = ['Elektronik', 'Furnitur', 'Perangkat Jaringan', 'Alat Tulis Kantor', 'Lainnya'];
-  const statuses = ['Semua', 'Tersedia', 'Digunakan', 'Rusak', 'Dalam Perbaikan'];
+  const categories = [
+    "Semua",
+    "Elektronik",
+    "Furnitur",
+    "Perangkat Jaringan",
+    "Alat Tulis Kantor",
+    "Lainnya",
+  ];
+  const formCategories = [
+    "Elektronik",
+    "Furnitur",
+    "Perangkat Jaringan",
+    "Alat Tulis Kantor",
+    "Lainnya",
+  ];
+  const statuses = [
+    "Semua",
+    "Tersedia",
+    "Digunakan",
+    "Rusak",
+    "Dalam Perbaikan",
+  ];
 
   // Filter logic
   const filteredItems = inventory.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (item.assignedToName && item.assignedToName.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesCategory = selectedCategory === 'Semua' || item.category === selectedCategory;
-    const matchesStatus = selectedStatus === 'Semua' || item.status === selectedStatus;
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.assignedToName &&
+        item.assignedToName.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesCategory =
+      selectedCategory === "Semua" || item.category === selectedCategory;
+    const matchesStatus =
+      selectedStatus === "Semua" || item.status === selectedStatus;
 
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
   const handleOpenAdd = () => {
     setFormData({
-      assetType: '',
-      name: '',
-      brand: '',
-      code: `INV-${Math.floor(100+Math.random()*900)}`,
-      category: 'Elektronik',
+      assetType: "",
+      name: "",
+      brand: "",
+      code: `INV-${Math.floor(100 + Math.random() * 900)}`,
+      category: "Elektronik",
       quantity: 1,
       unitPrice: 0,
-      status: 'Tersedia',
-      location: 'Gudang GA',
-      purchaseDate: new Date().toISOString().split('T')[0]
+      status: "Tersedia",
+      location: "Gudang GA",
+      purchaseDate: new Date().toISOString().split("T")[0],
     });
     setIsAddOpen(true);
   };
@@ -91,16 +127,16 @@ export default function Inventory({
   const handleOpenEdit = (item: InventoryItem) => {
     setCurrentItem(item);
     setFormData({
-      assetType: item.assetType || '',
+      assetType: item.assetType || "",
       name: item.name,
-      brand: item.brand || '',
+      brand: item.brand || "",
       code: item.code,
       category: item.category,
       quantity: item.quantity,
       unitPrice: item.unitPrice || 0,
       status: item.status,
       location: item.location,
-      purchaseDate: item.purchaseDate
+      purchaseDate: item.purchaseDate,
     });
     setIsEditOpen(true);
   };
@@ -110,14 +146,14 @@ export default function Inventory({
     if (!currentItem || !formData.name) return;
     onUpdateInventory({
       ...currentItem,
-      ...formData
+      ...formData,
     });
     setIsEditOpen(false);
   };
 
   const handleOpenAssign = (item: InventoryItem) => {
     setCurrentItem(item);
-    setAssigneeId(item.assignedToId || '');
+    setAssigneeId(item.assignedToId || "");
     setIsAssignOpen(true);
   };
 
@@ -125,21 +161,21 @@ export default function Inventory({
     e.preventDefault();
     if (!currentItem) return;
 
-    if (assigneeId === '') {
+    if (assigneeId === "") {
       // Unassign the item
       onUpdateInventory({
         ...currentItem,
         assignedToId: undefined,
         assignedToName: undefined,
-        status: 'Tersedia'
+        status: "Tersedia",
       });
     } else {
-      const selectedStaff = staff.find(s => s.id === assigneeId);
+      const selectedStaff = staff.find((s) => s.id === assigneeId);
       onUpdateInventory({
         ...currentItem,
         assignedToId: assigneeId,
         assignedToName: selectedStaff ? selectedStaff.name : undefined,
-        status: 'Digunakan'
+        status: "Digunakan",
       });
     }
     setIsAssignOpen(false);
@@ -150,7 +186,7 @@ export default function Inventory({
       ...item,
       assignedToId: undefined,
       assignedToName: undefined,
-      status: 'Tersedia'
+      status: "Tersedia",
     });
   };
 
@@ -167,24 +203,44 @@ export default function Inventory({
       // Expecting standard JSON array from worksheet
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
+      let successCount = 0;
       // Basic mapping: Maps excel column names to `Omit<InventoryItem, 'id'>`
-      jsonData.forEach((row) => {
-        if (!row.name && !row.Nama) return; // Basic validation
-        
-        const newItem: Omit<InventoryItem, 'id'> = {
-          name: row.name || row.Nama || 'Tanpa Nama',
-          category: row.category || row.Kategori || 'Lainnya',
-          status: row.status || row.Status || 'Tersedia',
-          condition: row.condition || row.Kondisi || 'Baik',
-          purchaseDate: row.purchaseDate || row.Tanggal || new Date().toISOString().split('T')[0],
-          price: Number(row.price || row.Harga || 0)
+      const promises = jsonData.map(async (row) => {
+        // More robust key matching by checking keys dynamically if needed, 
+        // but let's check common casing:
+        const name = row.name || row.Nama || row.nama || row.NAME || row.Name;
+        if (!name) return; // Skip empty rows
+
+        const newItem: Omit<InventoryItem, "id"> = {
+          assetType: row.assetType || row.JenisAset || row.Jenis || row.jenis || "",
+          name: name || "Tanpa Nama",
+          brand: row.brand || row.Merk || row.merk || "",
+          code:
+            row.code ||
+            row.Kode ||
+            row.kode ||
+            `INV-${Math.floor(100 + Math.random() * 9000)}`,
+          category: row.category || row.Kategori || row.kategori || "Lainnya",
+          quantity: Number(row.quantity || row.Jumlah || row.jumlah || 1),
+          unitPrice: Number(row.unitPrice || row.price || row.Harga || row.harga || 0),
+          status: (row.status || row.Status || "Tersedia") as any,
+          location: row.location || row.Lokasi || row.lokasi || "Gudang",
+          purchaseDate:
+            row.purchaseDate ||
+            row.Tanggal || row.tanggal ||
+            new Date().toISOString().split("T")[0],
         };
-        onAddInventory(newItem);
+        await onAddInventory(newItem);
+        successCount++;
       });
+      
+      await Promise.all(promises);
+
       // Need a way to show success
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+      alert(`Berhasil mengimpor ${successCount} data dari Excel!`);
     } catch (error) {
       console.error("Failed parsing Excel file", error);
       alert("Gagal memproses file Excel: " + (error as Error).message);
@@ -205,25 +261,29 @@ export default function Inventory({
         </div>
 
         <div className="flex items-center space-x-3">
-          <button 
+          <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
             className="relative overflow-hidden group bg-white border border-emerald-200 text-emerald-700 hover:text-emerald-800 disabled:opacity-50 font-bold text-xs px-4 py-2 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center space-x-2 uppercase"
           >
             <div className="absolute inset-0 bg-emerald-50/50 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
-            {isImporting ? <RefreshCw className="w-4 h-4 relative z-10 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 relative z-10" />}
+            {isImporting ? (
+              <RefreshCw className="w-4 h-4 relative z-10 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4 relative z-10" />
+            )}
             <span className="relative z-10 tracking-wider">
-              {isImporting ? 'Mengimpor...' : 'Import Excel'}
+              {isImporting ? "Mengimpor..." : "Import Excel"}
             </span>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept=".xlsx,.xls,.csv" 
-              onChange={handleImportExcel} 
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleImportExcel}
             />
           </button>
-          <button 
+          <button
             onClick={handleOpenAdd}
             className="relative overflow-hidden group bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-xs px-5 py-2 rounded-xl shadow-[0_4px_12px_-4px_rgba(15,23,42,0.6)] hover:shadow-[0_8px_16px_-4px_rgba(15,23,42,0.8)] transition-all flex items-center space-x-2 uppercase transform hover:-translate-y-0.5"
           >
@@ -258,7 +318,9 @@ export default function Inventory({
               className="border border-slate-200 rounded text-[11px] px-2 py-1 bg-white focus:outline-none focus:border-slate-400 font-semibold transition-colors cursor-pointer"
             >
               {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat === 'Semua' ? 'Sem. Kategori' : cat}</option>
+                <option key={cat} value={cat}>
+                  {cat === "Semua" ? "Sem. Kategori" : cat}
+                </option>
               ))}
             </select>
           </div>
@@ -270,7 +332,9 @@ export default function Inventory({
               className="border border-slate-200 rounded text-[11px] px-2 py-1 bg-white focus:outline-none focus:border-slate-400 font-semibold transition-colors cursor-pointer"
             >
               {statuses.map((st) => (
-                <option key={st} value={st}>{st === 'Semua' ? 'Sem. Status' : st}</option>
+                <option key={st} value={st}>
+                  {st === "Semua" ? "Sem. Status" : st}
+                </option>
               ))}
             </select>
           </div>
@@ -284,7 +348,9 @@ export default function Inventory({
             <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
               <HelpCircle className="w-5 h-5" />
             </div>
-            <p className="mt-2 text-[11px] font-bold text-slate-800">Tidak ada aset ditemukan</p>
+            <p className="mt-2 text-[11px] font-bold text-slate-800">
+              Tidak ada aset ditemukan
+            </p>
           </div>
         ) : (
           <div className="flex-1 overflow-auto">
@@ -310,31 +376,55 @@ export default function Inventory({
                 {filteredItems.map((item, index) => (
                   <tr key={item.id} className="hover:bg-slate-50/50">
                     <td className="text-[11px] text-slate-600">{index + 1}</td>
-                    <td className="text-[11px] text-slate-600">{item.assetType || '-'}</td>
+                    <td className="text-[11px] text-slate-600">
+                      {item.assetType || "-"}
+                    </td>
                     <td className="text-[11px] text-slate-600">{item.name}</td>
-                    <td className="text-[11px] text-slate-600">{item.brand || '-'}</td>
+                    <td className="text-[11px] text-slate-600">
+                      {item.brand || "-"}
+                    </td>
                     <td className="text-[11px] text-slate-600">{item.code}</td>
-                    <td className="text-[11px] text-slate-600">{item.category}</td>
-                    <td className="text-center text-[11px] text-slate-600">{item.quantity}</td>
-                    <td className="text-right text-[11px] text-slate-600">
-                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(item.unitPrice || 0)}
+                    <td className="text-[11px] text-slate-600">
+                      {item.category}
+                    </td>
+                    <td className="text-center text-[11px] text-slate-600">
+                      {item.quantity}
                     </td>
                     <td className="text-right text-[11px] text-slate-600">
-                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format((item.unitPrice || 0) * item.quantity)}
+                      {new Intl.NumberFormat("id-ID", {
+                        style: "currency",
+                        currency: "IDR",
+                      }).format(item.unitPrice || 0)}
+                    </td>
+                    <td className="text-right text-[11px] text-slate-600">
+                      {new Intl.NumberFormat("id-ID", {
+                        style: "currency",
+                        currency: "IDR",
+                      }).format((item.unitPrice || 0) * item.quantity)}
                     </td>
                     <td className="text-center text-[11px] text-slate-600">
                       {item.status}
                     </td>
-                    <td className="text-[11px] text-slate-600">{item.location}</td>
+                    <td className="text-[11px] text-slate-600">
+                      {item.location}
+                    </td>
                     <td className="text-center text-[11px] text-slate-600">
                       {item.purchaseDate.substring(0, 4)}
                     </td>
                     <td className="text-right">
                       <div className="inline-flex items-center space-x-1">
-                        <button onClick={() => handleOpenEdit(item)} className="p-1 text-slate-400 hover:text-indigo-600">
+                        <button
+                          onClick={() => handleOpenEdit(item)}
+                          className="p-1 text-slate-400 hover:text-indigo-600"
+                        >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => { if (confirm('Hapus?')) onDeleteInventory(item.id); }} className="p-1 text-slate-400 hover:text-red-600">
+                        <button
+                          onClick={() => {
+                            if (confirm("Hapus?")) onDeleteInventory(item.id);
+                          }}
+                          className="p-1 text-slate-400 hover:text-red-600"
+                        >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -353,30 +443,41 @@ export default function Inventory({
           <div className="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
               <h3 className="font-bold text-md">Tambah Aset Baru</h3>
-              <button onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+              <button
+                onClick={() => setIsAddOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Nama Barang / Aset</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Nama Barang / Aset
+                  </label>
                   <input
                     type="text"
                     required
                     placeholder="Contoh: Meja Lipat Aluminium"
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Jenis Aset</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Jenis Aset
+                  </label>
                   <input
                     type="text"
                     placeholder="Contoh: Laptop"
                     value={formData.assetType}
-                    onChange={(e) => setFormData({...formData, assetType: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, assetType: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
@@ -384,24 +485,34 @@ export default function Inventory({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Merk / Brand</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Merk / Brand
+                  </label>
                   <input
                     type="text"
                     placeholder="Contoh: ASUS"
                     value={formData.brand}
-                    onChange={(e) => setFormData({...formData, brand: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, brand: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Kategori</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Kategori
+                  </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   >
-                    {formCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {formCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -409,22 +520,33 @@ export default function Inventory({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Kode Barang</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Kode Barang
+                  </label>
                   <input
                     type="text"
                     required
                     value={formData.code}
-                    onChange={(e) => setFormData({...formData, code: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, code: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-mono"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Harga Satuan (Rp)</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Harga Satuan (Rp)
+                  </label>
                   <input
                     type="number"
                     min="0"
                     value={formData.unitPrice}
-                    onChange={(e) => setFormData({...formData, unitPrice: parseInt(e.target.value) || 0})}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        unitPrice: parseInt(e.target.value) || 0,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-mono"
                   />
                 </div>
@@ -432,23 +554,34 @@ export default function Inventory({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Jumlah (Quantity)</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Jumlah (Quantity)
+                  </label>
                   <input
                     type="number"
                     min="1"
                     required
                     value={formData.quantity}
-                    onChange={(e) => setFormData({...formData, quantity: parseInt(e.target.value) || 1})}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        quantity: parseInt(e.target.value) || 1,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Lokasi Penempatan</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Lokasi Penempatan
+                  </label>
                   <input
                     type="text"
                     placeholder="Contoh: Gudang GA"
                     value={formData.location}
-                    onChange={(e) => setFormData({...formData, location: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, location: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
@@ -456,19 +589,30 @@ export default function Inventory({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Tanggal Pembelian</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Tanggal Pembelian
+                  </label>
                   <input
                     type="date"
                     value={formData.purchaseDate}
-                    onChange={(e) => setFormData({...formData, purchaseDate: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, purchaseDate: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-mono"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Status Awal</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Status Awal
+                  </label>
                   <select
                     value={formData.status}
-                    onChange={(e) => setFormData({...formData, status: e.target.value as any})}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        status: e.target.value as any,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   >
                     <option value="Tersedia">Tersedia</option>
@@ -504,28 +648,39 @@ export default function Inventory({
           <div className="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
               <h3 className="font-bold text-md">Ubah Rincian Aset</h3>
-              <button onClick={() => setIsEditOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+              <button
+                onClick={() => setIsEditOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Nama Barang / Aset</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Nama Barang / Aset
+                  </label>
                   <input
                     type="text"
                     required
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Jenis Aset</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Jenis Aset
+                  </label>
                   <input
                     type="text"
                     value={formData.assetType}
-                    onChange={(e) => setFormData({...formData, assetType: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, assetType: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
@@ -533,23 +688,33 @@ export default function Inventory({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Merk / Brand</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Merk / Brand
+                  </label>
                   <input
                     type="text"
                     value={formData.brand}
-                    onChange={(e) => setFormData({...formData, brand: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, brand: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Kategori</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Kategori
+                  </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   >
-                    {formCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {formCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -557,22 +722,33 @@ export default function Inventory({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Kode Barang</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Kode Barang
+                  </label>
                   <input
                     type="text"
                     required
                     value={formData.code}
-                    onChange={(e) => setFormData({...formData, code: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, code: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-mono"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Harga Satuan (Rp)</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Harga Satuan (Rp)
+                  </label>
                   <input
                     type="number"
                     min="0"
                     value={formData.unitPrice}
-                    onChange={(e) => setFormData({...formData, unitPrice: parseInt(e.target.value) || 0})}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        unitPrice: parseInt(e.target.value) || 0,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-mono"
                   />
                 </div>
@@ -580,22 +756,33 @@ export default function Inventory({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Jumlah (Quantity)</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Jumlah (Quantity)
+                  </label>
                   <input
                     type="number"
                     min="1"
                     required
                     value={formData.quantity}
-                    onChange={(e) => setFormData({...formData, quantity: parseInt(e.target.value) || 1})}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        quantity: parseInt(e.target.value) || 1,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Lokasi Penempatan</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Lokasi Penempatan
+                  </label>
                   <input
                     type="text"
                     value={formData.location}
-                    onChange={(e) => setFormData({...formData, location: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, location: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
@@ -603,19 +790,30 @@ export default function Inventory({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Tanggal Pembelian</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Tanggal Pembelian
+                  </label>
                   <input
                     type="date"
                     value={formData.purchaseDate}
-                    onChange={(e) => setFormData({...formData, purchaseDate: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, purchaseDate: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-mono"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Kondisi</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Kondisi
+                  </label>
                   <select
                     value={formData.status}
-                    onChange={(e) => setFormData({...formData, status: e.target.value as any})}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        status: e.target.value as any,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   >
                     <option value="Tersedia">Tersedia</option>
@@ -652,25 +850,38 @@ export default function Inventory({
           <div className="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
               <h3 className="font-bold text-md">Alokasikan Aset Ke Staf</h3>
-              <button onClick={() => setIsAssignOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+              <button
+                onClick={() => setIsAssignOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleAssignSubmit} className="p-6 space-y-4">
               <div className="p-3 bg-indigo-50 text-indigo-950 rounded-lg space-y-1 border border-indigo-100/50">
-                <span className="text-[10px] uppercase font-bold text-indigo-500 leading-tight block">KETERANGAN ASET</span>
-                <span className="font-semibold text-sm block leading-normal">{currentItem.name}</span>
-                <span className="text-xs font-mono text-indigo-600">{currentItem.code} | Kondisi: {currentItem.status}</span>
+                <span className="text-[10px] uppercase font-bold text-indigo-500 leading-tight block">
+                  KETERANGAN ASET
+                </span>
+                <span className="font-semibold text-sm block leading-normal">
+                  {currentItem.name}
+                </span>
+                <span className="text-xs font-mono text-indigo-600">
+                  {currentItem.code} | Kondisi: {currentItem.status}
+                </span>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 block">Pilih Staf Penerima</label>
+                <label className="text-xs font-bold text-slate-700 block">
+                  Pilih Staf Penerima
+                </label>
                 <select
                   value={assigneeId}
                   onChange={(e) => setAssigneeId(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer"
                 >
-                  <option value="">-- Letakkan di Gudang (Bebaskan Aset) --</option>
+                  <option value="">
+                    -- Letakkan di Gudang (Bebaskan Aset) --
+                  </option>
                   {staff.map((member) => (
                     <option key={member.id} value={member.id}>
                       {member.name} ({member.role} - {member.department})
@@ -678,7 +889,15 @@ export default function Inventory({
                   ))}
                 </select>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Menetapkan staf secara otomatis mengubah status aset menjadi <strong className="text-slate-500 font-semibold">"Digunakan"</strong>. Menghapusnya akan mengembalikan ke <strong className="text-slate-500 font-semibold">"Tersedia"</strong>.
+                  Menetapkan staf secara otomatis mengubah status aset menjadi{" "}
+                  <strong className="text-slate-500 font-semibold">
+                    "Digunakan"
+                  </strong>
+                  . Menghapusnya akan mengembalikan ke{" "}
+                  <strong className="text-slate-500 font-semibold">
+                    "Tersedia"
+                  </strong>
+                  .
                 </p>
               </div>
 
@@ -701,7 +920,6 @@ export default function Inventory({
           </div>
         </div>
       )}
-
     </div>
   );
 }
