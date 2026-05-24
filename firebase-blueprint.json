@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "StaffProfile": {
+      "title": "StaffProfile",
+      "description": "Profile of a staff member",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "name": { "type": "string" },
+        "birthPlaceAndDate": { "type": "string" },
+        "address": { "type": "string" },
+        "education": { "type": "string" },
+        "trainingHistory": { "type": "string" },
+        "role": { "type": "string" },
+        "department": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["Aktif", "Cuti", "Nonaktif"] },
+        "joinDate": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "allocationsCount": { "type": "number" },
+        "leaveBalance": { "type": "number" },
+        "specialLeaveBalance": { "type": "number" }
+      },
+      "required": ["name", "role", "department", "email", "phone", "status", "joinDate", "leaveBalance"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "Item in the inventory",
+      "type": "object",
+      "properties": {
+        "assetType": { "type": "string" },
+        "name": { "type": "string" },
+        "brand": { "type": "string" },
+        "code": { "type": "string" },
+        "category": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unitPrice": { "type": "number" },
+        "assignedToId": { "type": "string" },
+        "assignedToName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Tersedia", "Digunakan", "Rusak", "Dalam Perbaikan"] },
+        "location": { "type": "string" },
+        "purchaseDate": { "type": "string" }
+      },
+      "required": ["name", "code", "category", "quantity", "status", "location", "purchaseDate"]
+    },
+    "LeaveRequest": {
+      "title": "LeaveRequest",
+      "description": "A leave request submitted by a staff member",
+      "type": "object",
+      "properties": {
+        "staffId": { "type": "string" },
+        "staffName": { "type": "string" },
+        "leaveType": { "type": "string", "enum": ["Cuti Tahunan", "Sakit", "Izin Khusus", "Cuti Melahirkan"] },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "durationDays": { "type": "number" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Disetujui", "Ditolak"] },
+        "requestDate": { "type": "string" }
+      },
+      "required": ["staffId", "staffName", "leaveType", "startDate", "endDate", "durationDays", "reason", "status", "requestDate"]
+    },
+    "DocumentArchive": {
+      "title": "DocumentArchive",
+      "description": "Archived document",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string", "enum": ["Laporan", "Legal", "Keuangan", "HR/SOP", "Memo/Umum"] },
+        "uploadDate": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "description": { "type": "string" },
+        "fileType": { "type": "string" },
+        "tags": { "type": "array" }
+      },
+      "required": ["name", "category", "uploadDate", "fileSize", "description", "fileType"]
+    }
+  },
+  "firestore": {
+    "/staff/{staffId}": {
+      "schema": { "$ref": "#/entities/StaffProfile" },
+      "description": "Collection of staff profiles"
+    },
+    "/inventory/{inventoryId}": {
+      "schema": { "$ref": "#/entities/InventoryItem" },
+      "description": "Collection of inventory items"
+    },
+    "/leaves/{leaveId}": {
+      "schema": { "$ref": "#/entities/LeaveRequest" },
+      "description": "Collection of leave requests"
+    },
+    "/documents/{documentId}": {
+      "schema": { "$ref": "#/entities/DocumentArchive" },
+      "description": "Collection of document archives"
+    }
+  }
+}
