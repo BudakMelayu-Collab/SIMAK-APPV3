@@ -20,18 +20,49 @@ import AiAssistant from "./components/AiAssistant";
 import Login from "./components/Login";
 
 // Importing Icons
-import { LayoutDashboard, Package, Users, CalendarDays, FileBox, ChevronLeft, ChevronRight, Menu, X, User as UserIcon, Bell, Building2, Clock, ArrowUpRight, LogOut, ShieldCheck, Crown, Bot } from "lucide-react";
+import {
+  LayoutDashboard,
+  Package,
+  Users,
+  CalendarDays,
+  FileBox,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  X,
+  User as UserIcon,
+  Bell,
+  Building2,
+  Clock,
+  ArrowUpRight,
+  LogOut,
+  ShieldCheck,
+  Crown,
+  Bot,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { collection, onSnapshot, setDoc, updateDoc, deleteDoc, doc, writeBatch, getDocFromServer } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  writeBatch,
+  getDocFromServer,
+} from "firebase/firestore";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { db, auth } from "./firebase";
 import { handleFirestoreError, OperationType } from "./firestoreUtils";
 
 async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    await getDocFromServer(doc(db, "test", "connection"));
   } catch (error) {
-    if(error instanceof Error && error.message.includes('the client is offline')) {
+    if (
+      error instanceof Error &&
+      error.message.includes("the client is offline")
+    ) {
       console.error("Please check your Firebase configuration.");
     }
   }
@@ -76,33 +107,65 @@ export default function App() {
 
     // Load Staff
     unsubs.push(
-      onSnapshot(collection(db, "staff"), (snapshot) => {
-        setStaff(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffProfile)));
-      }, (error) => handleFirestoreError(error, OperationType.GET, "staff"))
+      onSnapshot(
+        collection(db, "staff"),
+        (snapshot) => {
+          setStaff(
+            snapshot.docs.map(
+              (doc) => ({ id: doc.id, ...doc.data() }) as StaffProfile,
+            ),
+          );
+        },
+        (error) => handleFirestoreError(error, OperationType.GET, "staff"),
+      ),
     );
 
     // Load Inventory
     unsubs.push(
-      onSnapshot(collection(db, "inventory"), (snapshot) => {
-        setInventory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem)));
-      }, (error) => handleFirestoreError(error, OperationType.GET, "inventory"))
+      onSnapshot(
+        collection(db, "inventory"),
+        (snapshot) => {
+          setInventory(
+            snapshot.docs.map(
+              (doc) => ({ id: doc.id, ...doc.data() }) as InventoryItem,
+            ),
+          );
+        },
+        (error) => handleFirestoreError(error, OperationType.GET, "inventory"),
+      ),
     );
 
     // Load Leaves
     unsubs.push(
-      onSnapshot(collection(db, "leaves"), (snapshot) => {
-        setLeaves(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
-      }, (error) => handleFirestoreError(error, OperationType.GET, "leaves"))
+      onSnapshot(
+        collection(db, "leaves"),
+        (snapshot) => {
+          setLeaves(
+            snapshot.docs.map(
+              (doc) => ({ id: doc.id, ...doc.data() }) as LeaveRequest,
+            ),
+          );
+        },
+        (error) => handleFirestoreError(error, OperationType.GET, "leaves"),
+      ),
     );
 
     // Load Documents
     unsubs.push(
-      onSnapshot(collection(db, "documents"), (snapshot) => {
-        setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DocumentArchive)));
-      }, (error) => handleFirestoreError(error, OperationType.GET, "documents"))
+      onSnapshot(
+        collection(db, "documents"),
+        (snapshot) => {
+          setDocuments(
+            snapshot.docs.map(
+              (doc) => ({ id: doc.id, ...doc.data() }) as DocumentArchive,
+            ),
+          );
+        },
+        (error) => handleFirestoreError(error, OperationType.GET, "documents"),
+      ),
     );
 
-    return () => unsubs.forEach(unsub => unsub());
+    return () => unsubs.forEach((unsub) => unsub());
   }, [isAuthenticated]);
 
   // --- Handlers for Inventory ---
@@ -146,15 +209,17 @@ export default function App() {
     try {
       const { id, ...data } = updatedProfile;
       const batch = writeBatch(db);
-      
+
       batch.update(doc(db, "staff", id), data);
 
       inventory.forEach((item) => {
         if (item.assignedToId === id) {
-          batch.update(doc(db, "inventory", item.id), { assignedToName: updatedProfile.name });
+          batch.update(doc(db, "inventory", item.id), {
+            assignedToName: updatedProfile.name,
+          });
         }
       });
-      
+
       await batch.commit();
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, "staff");
@@ -164,7 +229,7 @@ export default function App() {
   const handleDeleteStaff = async (id: string) => {
     try {
       const batch = writeBatch(db);
-      
+
       batch.delete(doc(db, "staff", id));
 
       inventory.forEach((item) => {
@@ -172,14 +237,14 @@ export default function App() {
           batch.update(doc(db, "inventory", item.id), {
             assignedToId: null,
             assignedToName: null,
-            status: "Tersedia"
+            status: "Tersedia",
           });
         }
       });
 
       leaves.forEach((l) => {
         if (l.staffId === id) {
-           batch.delete(doc(db, "leaves", l.id));
+          batch.delete(doc(db, "leaves", l.id));
         }
       });
 
@@ -208,22 +273,22 @@ export default function App() {
 
     try {
       const batch = writeBatch(db);
-      
+
       batch.update(doc(db, "leaves", id), { status: "Disetujui" });
 
-      const member = staff.find(s => s.id === req.staffId);
+      const member = staff.find((s) => s.id === req.staffId);
       if (member) {
         const newBalance = Math.max(0, member.leaveBalance - req.durationDays);
-        batch.update(doc(db, "staff", member.id), { 
+        batch.update(doc(db, "staff", member.id), {
           leaveBalance: newBalance,
-          status: "Cuti"
+          status: "Cuti",
         });
       }
 
       inventory.forEach((item) => {
         if (item.assignedToId === req.staffId) {
           batch.update(doc(db, "inventory", item.id), {
-            assignedToName: `${req.staffName} (Sedang Cuti)`
+            assignedToName: `${req.staffName} (Sedang Cuti)`,
           });
         }
       });
@@ -542,7 +607,10 @@ export default function App() {
                         <div className="flex items-center space-x-3 relative z-10">
                           <div className="w-12 h-12 rounded-xl overflow-hidden ring-2 ring-white/20">
                             <img
-                              src={currentUser?.photoURL || "https://i.pravatar.cc/150"}
+                              src={
+                                currentUser?.photoURL ||
+                                "https://i.pravatar.cc/150"
+                              }
                               alt="Admin Profile"
                               className="w-full h-full object-cover"
                             />
@@ -597,6 +665,9 @@ export default function App() {
                   inventory={inventory}
                   leaves={leaves}
                   documents={documents}
+                  userName={
+                    currentUser?.displayName || currentUser?.email || undefined
+                  }
                   onNavigate={(tab) => setActiveTab(tab)}
                   onApproveLeave={handleApproveLeave}
                   onRejectLeave={handleRejectLeave}
