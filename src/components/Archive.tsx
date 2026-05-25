@@ -9,11 +9,17 @@ import {
   Download,
   X,
   Check,
-  FileCode,
   Archive,
   HelpCircle,
   Sparkles,
   Loader2,
+  Tag,
+  Inbox,
+  Users,
+  DollarSign,
+  Calendar,
+  ShieldCheck,
+  Eye,
 } from "lucide-react";
 
 interface ArchiveProps {
@@ -277,8 +283,24 @@ export default function DocumentArchiveView({
   };
 
   const triggerSimulatedDownload = (docName: string) => {
+    // Generate a simple blob as the downloaded file content
+    const blob = new Blob(
+      [
+        `Ini adalah isi dari dokumen ${docName}.\n\n(Simulasi dokumen berhasil diunduh)`,
+      ],
+      { type: "text/plain" },
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = docName.includes(".") ? docName : `${docName}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
     setIsAlertDownload(
-      `Mengunduh berkas "${docName}"... Berkas berhasil diunduh ke folder Downloads Anda.`,
+      `Mengunduh berkas "${docName}"... Berkas berhasil diunduh.`,
     );
     setTimeout(() => {
       setIsAlertDownload(null);
@@ -406,95 +428,59 @@ export default function DocumentArchiveView({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {filteredDocs.map((doc) => {
+              const baseCat =
+                doc.category === "HR/SOP" ? "SOP Kantor" : doc.category;
+              const dateStr =
+                doc.uploadDate || new Date().toISOString().split("T")[0];
+
+              // Helper to infer "Prihal" and "Jenis" if the name or description matches our manual input.
+              let prihal = doc.name.replace(/\.[^/.]+$/, ""); // remove extension
+              if (prihal.includes("_")) {
+                prihal = prihal.split("_").slice(1).join(" ") || prihal;
+              }
+              if (prihal.length > 30) prihal = prihal.substring(0, 30) + "...";
+
+              let jenisNaskah = "Dinas Masuk";
+              if (doc.description.includes("Naskah Dinas Keluar"))
+                jenisNaskah = "Dinas Keluar";
+              if (doc.description.includes("Arsip Umum")) jenisNaskah = "Umum";
+
+              const mockupPihak =
+                doc.name.length % 2 === 0
+                  ? "Budi Santoso"
+                  : "M. Sanusi Bernawa";
+              const mockupValue =
+                doc.category === "Keuangan" ? "Rp 15.000.000" : "$ -";
+              const mockupRisiko =
+                doc.category === "Legal" ? "TINGGI" : "RENDAH";
+              const isRisikoTinggi = mockupRisiko === "TINGGI";
+
+              const aiSummary =
+                doc.description && doc.description.length > 20
+                  ? doc.description
+                  : `${doc.name} merupakan bagian dari ${baseCat} yang telah diajukan dan diarsipkan secara digital. Dokumen administrasi resmi ini diterbitkan pada tanggal ${dateStr}.`;
+
+              const saranTags = [
+                "pengadaan laptop",
+                "sop kantor",
+                "naskah dinas",
+                "administrasi",
+              ];
+
               return (
                 <div
                   key={doc.id}
-                  className="bg-white rounded-2xl p-5 border border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl hover:shadow-indigo-900/10 cursor-pointer relative group flex flex-col justify-between transition-all transform hover:-translate-y-1 overflow-hidden"
+                  className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col space-y-5 shadow-sm transition-all hover:shadow-md h-full relative"
                 >
-                  <div className="absolute -right-6 -top-6 w-24 h-24 bg-gradient-to-br from-slate-50 to-slate-100 rounded-full group-hover:scale-150 transition-transform duration-500 ease-in-out z-0"></div>
-                  <div className="space-y-4 relative z-10">
-                    <div className="flex items-start justify-between">
-                      {/* Unique Category Badge */}
-                      <span
-                        className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md tracking-wider ${
-                          doc.category === "Laporan"
-                            ? "bg-indigo-100 text-indigo-800"
-                            : doc.category === "Keuangan"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : doc.category === "Legal"
-                                ? "bg-rose-100 text-rose-800"
-                                : doc.category === "HR/SOP"
-                                  ? "bg-cyan-100 text-cyan-800"
-                                  : "bg-slate-200 text-slate-600"
-                        }`}
-                      >
-                        {doc.category}
-                      </span>
-
-                      {/* Meta info size */}
-                      <span className="text-[10px] text-slate-400 font-mono font-bold bg-slate-50 px-2 py-1 rounded-md">
-                        {doc.fileSize}
-                      </span>
+                  {/* Header Row */}
+                  <div className="flex items-center justify-between">
+                    <div className="bg-indigo-50 text-indigo-700 font-bold px-3 py-1 rounded-md text-xs uppercase tracking-wider">
+                      {baseCat}
                     </div>
-
-                    {/* File title */}
-                    <div className="flex items-start space-x-3">
-                      <div className="p-2.5 bg-gradient-to-br from-slate-50 to-slate-100 text-slate-500 rounded-xl group-hover:from-indigo-500 group-hover:to-indigo-600 group-hover:text-white transition-all shadow-inner shrink-0">
-                        <FileText className="w-6 h-6" />
-                      </div>
-                      <div className="min-w-0 mt-0.5">
-                        <h4
-                          className="font-bold text-sm text-slate-800 leading-tight group-hover:text-indigo-700 transition-colors line-clamp-2"
-                          title={doc.name}
-                        >
-                          {doc.name}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 font-mono mt-1">
-                          {doc.id} &bull; {doc.uploadDate || "24/05/2026"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-xs text-slate-500 leading-relaxed font-sans line-clamp-2">
-                      {doc.description}
-                    </p>
-
-                    {/* Tags */}
-                    {doc.tags && doc.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-3">
-                        {doc.tags.map((tag, i) => (
-                          <span
-                            key={i}
-                            className="text-[9px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md"
-                          >
-                            #{tag.trim()}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Card footer options */}
-                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between relative z-10">
-                    {/* Extension banner */}
-                    <span className="text-[10px] font-mono bg-slate-100/80 text-slate-500 px-2.5 py-1 rounded-md font-extrabold uppercase">
-                      .{doc.fileType}
-                    </span>
-
-                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity space-x-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          triggerSimulatedDownload(doc.name);
-                        }}
-                        className="px-3 py-1.5 text-[10px] font-bold text-indigo-700 hover:text-white bg-indigo-50 hover:bg-indigo-600 rounded-lg transition-all"
-                        title="Download Dokumen"
-                      >
-                        Unduh
-                      </button>
+                    <div className="flex items-center space-x-3 text-slate-400">
+                      <span className="text-xs font-mono">{dateStr}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -504,12 +490,179 @@ export default function DocumentArchiveView({
                             onDeleteDocument(doc.id);
                           }
                         }}
-                        className="p-1.5 text-slate-400 hover:text-white hover:bg-rose-500 rounded-lg transition-colors"
-                        title="Hapus"
+                        className="hover:text-rose-500 transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="text-xl font-extrabold text-slate-800 leading-tight">
+                    Surat Keputusan
+                  </h3>
+
+                  {/* Meta Info Box */}
+                  <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                        Prihal
+                      </p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {prihal}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                        Jenis Naskah
+                      </p>
+                      <p className="text-sm font-semibold text-slate-700 flex items-center space-x-2">
+                        <Inbox className="w-4 h-4 text-blue-500" />
+                        <span>{jenisNaskah}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Berkas Naskah Text */}
+                  <h4 className="text-[13px] font-medium text-slate-500 pt-1">
+                    Berkas Naskah
+                  </h4>
+
+                  {/* File Info Card */}
+                  <div className="border border-dashed border-slate-300 bg-slate-50/30 rounded-xl p-3 flex items-center justify-between">
+                    <div className="flex items-center space-x-3 overflow-hidden pr-3">
+                      <div className="bg-blue-50 text-blue-600 font-extrabold text-[10px] px-2.5 py-1.5 rounded-lg shrink-0">
+                        {doc.fileType.toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-700 truncate">
+                          {doc.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          {doc.fileSize}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerSimulatedDownload(doc.name);
+                      }}
+                      className="shrink-0 p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Tags */}
+                  <div className="flex flex-wrap gap-2">
+                    {doc.tags && doc.tags.length > 0 ? (
+                      doc.tags.map((t) => (
+                        <span
+                          key={t}
+                          className="flex items-center space-x-1.5 border border-slate-200 text-slate-600 bg-white px-2 py-1 rounded text-[10px] font-semibold uppercase"
+                        >
+                          <Tag className="w-3 h-3 text-slate-400" />
+                          <span>{t}</span>
+                        </span>
+                      ))
+                    ) : (
+                      // Default fake tags if none
+                      <>
+                        <span className="flex items-center space-x-1.5 border border-slate-200 text-slate-600 bg-white px-2 py-1 rounded text-[10px] font-semibold uppercase ">
+                          <Tag className="w-3 h-3 text-slate-400" />
+                          <span>Pajak</span>
+                        </span>
+                        <span className="flex items-center space-x-1.5 border border-slate-200 text-slate-600 bg-white px-2 py-1 rounded text-[10px] font-semibold uppercase ">
+                          <Tag className="w-3 h-3 text-slate-400" />
+                          <span>Surat Keputusan</span>
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Gemini Insights Box */}
+                  <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-5 space-y-4">
+                    <div className="flex items-center space-x-2 text-indigo-600 font-bold text-[11px] uppercase tracking-widest">
+                      <Sparkles className="w-4 h-4" />
+                      <span>Gemini Discovery Insights</span>
+                    </div>
+
+                    <div className="bg-white border border-slate-100 p-4 rounded-xl text-[13px] text-slate-600 leading-relaxed">
+                      {aiSummary}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 bg-slate-100/50 p-4 rounded-xl border border-slate-100/50">
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                          Pihak Terlibat
+                        </p>
+                        <p className="text-xs font-semibold text-slate-700 flex items-center space-x-1.5">
+                          <Users className="w-3 h-3 text-indigo-400" />{" "}
+                          <span>{mockupPihak}</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                          Value Transaksi
+                        </p>
+                        <p className="text-xs font-semibold text-slate-700 flex items-center space-x-1.5">
+                          <DollarSign className="w-3 h-3 text-emerald-500" />{" "}
+                          <span>{mockupValue}</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                          Masa Berlaku / Tenggat
+                        </p>
+                        <p className="text-xs font-semibold text-slate-700 flex items-center space-x-1.5">
+                          <Calendar className="w-3 h-3 text-amber-500" />{" "}
+                          <span>{dateStr}</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                          Tingkat Risiko
+                        </p>
+                        <span
+                          className={`font-bold px-2 py-0.5 rounded text-[9px] flex items-center w-fit space-x-1.5 ${isRisikoTinggi ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"}`}
+                        >
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>{mockupRisiko}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">
+                        Saran Tag Baru (Klik untuk pasang):
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {saranTags.map((st) => (
+                          <span
+                            key={st}
+                            className="bg-emerald-50 text-emerald-600 font-medium px-2 py-1 rounded text-[10px] border border-emerald-100 flex items-center space-x-1 cursor-pointer hover:bg-emerald-100 transition-colors"
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>{st}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Spacer to push footer to bottom */}
+                  <div className="flex-1"></div>
+
+                  {/* Footer */}
+                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <button className="flex items-center space-x-2 text-slate-600 hover:text-indigo-600 font-bold text-xs transition-colors">
+                      <Eye className="w-4 h-4" />
+                      <span>Intip Naskah Asli</span>
+                    </button>
+                    <span className="border border-emerald-200 text-emerald-600 bg-emerald-50 font-bold px-3 py-1 rounded-full text-xs">
+                      Aktif
+                    </span>
                   </div>
                 </div>
               );

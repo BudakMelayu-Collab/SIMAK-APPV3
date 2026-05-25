@@ -3,16 +3,11 @@ import { LeaveRequest, StaffProfile } from "../types";
 import {
   Calendar,
   Plus,
-  Search,
-  Filter,
-  Clock,
   CheckCircle,
+  CheckSquare,
   XCircle,
-  ChevronRight,
-  HelpCircle,
   X,
   AlertOctagon,
-  UserCheck,
 } from "lucide-react";
 
 interface LeaveProps {
@@ -31,13 +26,8 @@ export default function Leave({
   onRejectLeave,
 }: LeaveProps) {
   // Filters or search State
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("Semua");
-
-  // Tabs State
-  const [activeTab, setActiveTab] = useState<"permohonan" | "rekap">(
-    "permohonan",
-  );
+  const [notes, setNotes] = useState<Record<string, string>>({});
 
   // Submit Modal States
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
@@ -52,9 +42,8 @@ export default function Leave({
   });
 
   // Calculate leaves statistics
+  const totalOnLeave = staff.filter((s) => s.status === "Cuti").length;
   const totalPending = leaves.filter((l) => l.status === "Pending").length;
-  const totalApproved = leaves.filter((l) => l.status === "Disetujui").length;
-  const totalRejected = leaves.filter((l) => l.status === "Ditolak").length;
 
   const handleOpenRequest = () => {
     // Select first staff as default
@@ -117,324 +106,290 @@ export default function Leave({
 
   // Filter Leave requests list
   const filteredLeaves = leaves.filter((req) => {
-    const matchesSearch =
-      req.staffName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.reason.toLowerCase().includes(searchTerm.toLowerCase());
-
     const matchesStatus =
       selectedStatus === "Semua" || req.status === selectedStatus;
-
-    return matchesSearch && matchesStatus;
+    return matchesStatus;
   });
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      {/* Header section with Actions */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-bold tracking-tight text-slate-800 uppercase">
-            KONTROL ABSENSI & CUTI
-          </h2>
+    <div className="flex flex-col h-full space-y-6">
+      {/* Grid Dashboard Widget Khusus Cuti */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-[#FFF9EA] border border-amber-100 rounded-xl p-5 flex items-start space-x-4">
+          <div className="p-3 bg-white border border-amber-200 rounded-xl text-amber-500 shadow-sm shrink-0">
+            <Calendar className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+              SEDANG MENGAMBIL CUTI
+            </h3>
+            <div className="flex items-baseline space-x-1 mt-1">
+              <span className="text-2xl font-extrabold text-amber-700">
+                {totalOnLeave}
+              </span>
+              <span className="text-amber-700 font-bold text-sm">Staff</span>
+            </div>
+            <p className="text-[11px] text-amber-600 mt-1">
+              Berdasarkan status keaktifan live
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-[#F0F5FF] border border-blue-100 rounded-xl p-5 flex items-start space-x-4">
+          <div className="p-3 bg-white border border-blue-200 rounded-xl text-blue-500 shadow-sm shrink-0">
+            <CheckSquare className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+              MENUNGGU VERIFIKASI HR
+            </h3>
+            <div className="flex items-baseline space-x-1 mt-1">
+              <span className="text-2xl font-extrabold text-blue-800">
+                {totalPending}
+              </span>
+              <span className="text-blue-800 font-bold text-sm">Berkas</span>
+            </div>
+            <p className="text-[11px] text-blue-600 mt-1">
+              Membutuhkan persetujuan administrasi
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-[#F0FDF4] border border-emerald-100 rounded-xl p-5 flex items-start space-x-4">
+          <div className="p-3 bg-white border border-emerald-200 rounded-xl text-emerald-500 shadow-sm shrink-0">
+            <Calendar className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+              RASIO REKOR KEHADIRAN
+            </h3>
+            <div className="flex items-baseline space-x-1 mt-1">
+              <span className="text-2xl font-extrabold text-emerald-700">
+                94.8%
+              </span>
+            </div>
+            <p className="text-[11px] text-emerald-600 mt-1">
+              Rata-rata tahun anggaran berjalan
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs and Actions */}
+      <div className="bg-white border text-sm font-semibold border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
+        <div className="flex bg-slate-50 border border-slate-100 rounded-lg p-1 space-x-1">
+          {["Semua", "Pending", "Disetujui", "Ditolak"].map((status) => (
+            <button
+              key={status}
+              onClick={() => setSelectedStatus(status)}
+              className={`px-4 py-2 text-[13px] rounded-md transition-all ${
+                selectedStatus === status
+                  ? "bg-white text-slate-800 shadow-sm border border-slate-200 font-bold"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {status === "Semua" ? "Semua Berkas" : status}
+            </button>
+          ))}
         </div>
 
         <button
           onClick={handleOpenRequest}
-          className="bg-slate-800 hover:bg-slate-900 text-white font-bold text-[10px] px-3 py-1.5 rounded shadow-xs hover:shadow-sm inline-flex items-center space-x-1.5 transition-all"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[13px] px-4 py-2 rounded-lg shadow-sm transition-all flex items-center space-x-2"
         >
-          <Plus className="w-3 h-3" />
-          <span>AJUKAN CUTI</span>
+          <Plus className="w-4 h-4" />
+          <span>Ajukan Cuti Mandiri</span>
         </button>
       </div>
 
-      {/* Grid Dashboard Widget Khusus Cuti */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-        <div className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-white p-5 rounded-2xl shadow-sm border border-amber-100/50 flex items-center justify-between group transition-all hover:shadow-md">
-          <div className="absolute top-0 right-0 w-28 h-28 bg-amber-400/20 rounded-full blur-3xl -mr-10 -mt-10 transition-transform duration-500 group-hover:scale-110"></div>
-          <div className="relative flex items-center space-x-4">
-            <div className="p-3 bg-gradient-to-br from-amber-400 to-amber-500 text-white rounded-xl shadow-[0_4px_12px_-4px_rgba(251,191,36,0.5)]">
-              <Clock className="w-6 h-6" />
+      {/* Leave Application History Table */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex-1 flex flex-col overflow-hidden">
+        {filteredLeaves.length === 0 ? (
+          <div className="p-8 text-center flex flex-col items-center justify-center h-full min-h-[300px]">
+            <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+              <Calendar className="w-5 h-5" />
             </div>
-            <span className="text-xs text-slate-600 font-bold uppercase tracking-widest">
-              Menunggu
-            </span>
+            <p className="mt-2 text-[13px] font-bold text-slate-800">
+              Tidak ada pengajuan ditemukan
+            </p>
           </div>
-          <span className="relative text-4xl font-black text-slate-800 leading-none font-mono drop-shadow-sm">
-            {totalPending}
-          </span>
-        </div>
+        ) : (
+          <div className="flex-1 overflow-x-auto">
+            <table className="w-full whitespace-nowrap min-w-max text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-64 text-left border-r border-slate-200">
+                    NAMA STAF DAN DIVISI
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-40 text-center">
+                    HAK CUTI TAHUNAN
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-40 text-center">
+                    HAK CUTI KHUSUS
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-44 text-center">
+                    JUMLAH CUTI TAHUNAN
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-64 text-center border-r border-slate-200">
+                    JUMLAH CUTI TAHUNAN YANG SUDAH DI AMBIL
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-40 text-center border-r border-slate-200">
+                    SISA CUTI TAHUNAN
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-40">
+                    JENIS CUTI
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 min-w-[200px]">
+                    PERIODE TANGGAL (DURASI)
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 min-w-[150px]">
+                    ALASAN PENGAJUAN
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-32 text-center">
+                    STATUS BERKAS
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-64">
+                    Persetujuan dan Catatan SAU
+                  </th>
+                  <th className="font-bold text-[11px] text-slate-500 uppercase tracking-wide px-5 py-4 w-64">
+                    RIWAYAT PENGAMBILAN CUTI TAHUNAN
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredLeaves.map((req) => {
+                  const member = staff.find((s) => s.id === req.staffId);
+                  const hakKhusus =
+                    member?.specialLeaveBalance !== undefined
+                      ? member.specialLeaveBalance
+                      : 12;
+                  const hakTahunan = 12;
+                  const sisaTahunan = member?.leaveBalance ?? 12;
+                  const sudahDiambil = hakTahunan - sisaTahunan;
 
-        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-white p-5 rounded-2xl shadow-sm border border-emerald-100/50 flex items-center justify-between group transition-all hover:shadow-md">
-          <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-400/20 rounded-full blur-3xl -mr-10 -mt-10 transition-transform duration-500 group-hover:scale-110"></div>
-          <div className="relative flex items-center space-x-4">
-            <div className="p-3 bg-gradient-to-br from-emerald-400 to-emerald-500 text-white rounded-xl shadow-[0_4px_12px_-4px_rgba(52,211,153,0.5)]">
-              <CheckCircle className="w-6 h-6" />
-            </div>
-            <span className="text-xs text-slate-600 font-bold uppercase tracking-widest">
-              Disetujui
-            </span>
-          </div>
-          <span className="relative text-4xl font-black text-slate-800 leading-none font-mono drop-shadow-sm">
-            {totalApproved}
-          </span>
-        </div>
-
-        <div className="relative overflow-hidden bg-gradient-to-br from-rose-50 to-white p-5 rounded-2xl shadow-sm border border-rose-100/50 flex items-center justify-between group transition-all hover:shadow-md">
-          <div className="absolute top-0 right-0 w-28 h-28 bg-rose-400/20 rounded-full blur-3xl -mr-10 -mt-10 transition-transform duration-500 group-hover:scale-110"></div>
-          <div className="relative flex items-center space-x-4">
-            <div className="p-3 bg-gradient-to-br from-rose-400 to-rose-500 text-white rounded-xl shadow-[0_4px_12px_-4px_rgba(251,113,133,0.5)]">
-              <XCircle className="w-6 h-6" />
-            </div>
-            <span className="text-xs text-slate-600 font-bold uppercase tracking-widest">
-              Ditolak
-            </span>
-          </div>
-          <span className="relative text-4xl font-black text-slate-800 leading-none font-mono drop-shadow-sm">
-            {totalRejected}
-          </span>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg self-start">
-        <button
-          onClick={() => setActiveTab("permohonan")}
-          className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === "permohonan" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-        >
-          Permohonan Cuti
-        </button>
-        <button
-          onClick={() => setActiveTab("rekap")}
-          className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === "rekap" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-        >
-          Rekapitulasi Cuti Karyawan
-        </button>
-      </div>
-
-      {activeTab === "permohonan" ? (
-        <>
-          {/* Search & Filter Bar */}
-          <div className="bg-slate-50 p-2 border border-slate-200 rounded flex flex-col sm:flex-row gap-2">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-1.5 w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Cari permohonan..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1 border border-slate-200 rounded text-[11px] bg-white focus:outline-none focus:border-slate-400 transition-all font-sans"
-              />
-            </div>
-
-            {/* Dropdowns */}
-            <div className="flex items-center space-x-2">
-              <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0 hidden sm:block" />
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="border border-slate-200 rounded text-[11px] px-2 py-1 bg-white focus:outline-none focus:border-slate-400 font-semibold transition-colors cursor-pointer"
-              >
-                <option value="Semua">Semua Keputusan</option>
-                <option value="Pending">Menunggu Approval</option>
-                <option value="Disetujui">Telah Disetujui</option>
-                <option value="Ditolak">Ditolak</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Leave Application History Table */}
-          <div className="card-container flex-1 min-h-[300px]">
-            {filteredLeaves.length === 0 ? (
-              <div className="p-8 text-center flex flex-col items-center justify-center h-full">
-                <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <p className="mt-2 text-[11px] font-bold text-slate-800">
-                  Tidak ada pengajuan ditemukan
-                </p>
-              </div>
-            ) : (
-              <div className="flex-1 overflow-auto">
-                <table className="high-density-table whitespace-nowrap">
-                  <thead>
-                    <tr>
-                      <th className="text-left font-normal text-[11px]">
-                        No Induk
-                      </th>
-                      <th className="text-left font-normal text-[11px]">
-                        Nama Karyawan
-                      </th>
-                      <th className="text-left w-32 font-normal text-[11px]">
-                        Jenis Cuti
-                      </th>
-                      <th className="text-left w-40 font-normal text-[11px]">
-                        Tanggal
-                      </th>
-                      <th className="text-left font-normal text-[11px]">
-                        Durasi
-                      </th>
-                      <th className="text-left font-normal text-[11px]">
-                        Alasan
-                      </th>
-                      <th className="text-left w-24 font-normal text-[11px]">
-                        Status
-                      </th>
-                      <th className="text-right font-normal text-[11px]">
-                        Aksi
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLeaves.map((req) => (
-                      <tr key={req.id} className="hover:bg-slate-50/50">
-                        <td className="font-mono font-normal text-[11px] text-slate-800">
-                          {req.staffId}
-                        </td>
-                        <td className="font-normal text-[11px] text-slate-800">
-                          {req.staffName}
-                        </td>
-                        <td className="font-normal text-[11px] text-slate-800 capitalize">
-                          {req.leaveType}
-                        </td>
-                        <td className="font-normal text-[11px] text-slate-800 font-mono whitespace-nowrap">
-                          {req.startDate} s/d {req.endDate}
-                        </td>
-                        <td className="font-normal text-[11px] text-slate-800 font-mono">
-                          {req.durationDays} Hr
-                        </td>
-                        <td className="font-normal text-[11px] text-slate-800 italic whitespace-normal max-w-md">
-                          "{req.reason}"
-                        </td>
-                        <td className="font-normal text-[11px] text-slate-800 capitalize">
-                          {req.status}
-                        </td>
-                        <td className="text-right relative">
-                          {req.status === "Pending" ? (
-                            <div className="inline-flex space-x-2">
-                              <button
-                                onClick={() => onRejectLeave(req.id)}
-                                className="flex-1 bg-white hover:bg-rose-50 text-rose-600 font-semibold text-[11px] px-3 py-1 border border-rose-200 rounded-md transition-all shadow-sm flex items-center justify-center space-x-1 uppercase"
-                              >
-                                <XCircle className="w-3 h-3" />
-                                <span>Tolak</span>
-                              </button>
-                              <button
-                                onClick={() => onApproveLeave(req.id)}
-                                className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold text-[11px] px-3 py-1 rounded-md shadow-sm transition-all flex items-center justify-center space-x-1 uppercase"
-                              >
-                                <CheckCircle className="w-3 h-3" />
-                                <span>Setujui</span>
-                              </button>
-                            </div>
+                  return (
+                    <tr
+                      key={req.id}
+                      className="hover:bg-slate-50/50 transition-colors"
+                    >
+                      <td className="px-5 py-4 border-r border-slate-200">
+                        <div className="flex items-center space-x-3">
+                          {member?.avatarUrl ? (
+                            <img
+                              src={member.avatarUrl}
+                              alt={member.name}
+                              className="w-10 h-10 rounded-full object-cover shrink-0"
+                            />
                           ) : (
-                            <div
-                              className={`mt-1 text-left px-2.5 py-2 rounded-lg text-[10px] w-56 ${req.status === "Disetujui" ? "bg-emerald-50/80 text-emerald-800 border border-emerald-100" : "bg-rose-50/80 text-rose-800 border border-rose-100"}`}
-                            >
-                              <span className="font-bold flex items-center space-x-1 mb-1">
-                                {req.status === "Disetujui" ? (
-                                  <CheckCircle className="w-3 h-3" />
-                                ) : (
-                                  <XCircle className="w-3 h-3" />
-                                )}
-                                <span>Catatan Atasan</span>
-                              </span>
-                              <span className="italic opacity-90 block leading-tight">
-                                {req.status === "Disetujui"
-                                  ? "Permohonan cuti disetujui, harap selesaikan serah terima tugas jika diperlukan."
-                                  : "Permohonan cuti tidak dapat disetujui saat ini, karena kebutuhan operasional."}
-                              </span>
+                            <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0 border border-indigo-100">
+                              {(req.staffName || "??")
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .substring(0, 2)
+                                .toUpperCase()}
                             </div>
                           )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-[13px] text-slate-800 truncate">
+                              {req.staffName}
+                            </h4>
+                            <p className="text-[11px] text-[#6D42F8] font-bold mt-0.5">
+                              {member?.department || "-"}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-center font-bold text-slate-700 text-[13px]">
+                        {hakTahunan} Hari
+                      </td>
+                      <td className="px-5 py-4 text-center font-medium text-slate-500 text-[13px]">
+                        {req.leaveType === "Sakit"
+                          ? "Sakit (Kondisi Kesehatan)"
+                          : "Sakit/Khusus (SOP)"}
+                      </td>
+                      <td className="px-5 py-4 text-center font-bold text-slate-700 text-[13px]">
+                        {hakTahunan} Hari
+                      </td>
+                      <td className="px-5 py-4 text-center font-bold text-slate-700 text-[13px] border-r border-slate-200">
+                        {sudahDiambil} Hari
+                      </td>
+                      <td className="px-5 py-4 text-center font-bold text-blue-600 text-[13px] border-r border-slate-200">
+                        {sisaTahunan} Hari
+                      </td>
+                      <td className="px-5 py-4 font-bold text-slate-700 text-[13px]">
+                        {req.leaveType}
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="font-bold text-slate-700 text-[13px]">
+                          {req.startDate} s/d {req.endDate}
+                        </p>
+                        <span className="inline-block px-2 py-0.5 mt-1 bg-slate-100 text-slate-500 rounded font-bold text-[10px]">
+                          {req.durationDays} Hari Kerja
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 font-medium text-slate-500 text-[13px]">
+                        {req.reason}
+                      </td>
+                      <td className="px-5 py-4 text-center">
+                        <span
+                          className={`inline-block px-3 py-1 text-[11px] font-bold rounded-full border ${
+                            req.status === "Pending"
+                              ? "bg-orange-50 text-orange-600 border-orange-100"
+                              : req.status === "Disetujui"
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                : "bg-rose-50 text-rose-600 border-rose-100"
+                          }`}
+                        >
+                          {req.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        {req.status === "Pending" ? (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={notes[req.id] || ""}
+                              onChange={(e) =>
+                                setNotes({ ...notes, [req.id]: e.target.value })
+                              }
+                              placeholder="Tambah catatan/jawaban SAU..."
+                              className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded text-slate-600 bg-white"
+                            />
+                            <div className="flex justify-end space-x-2">
+                              <button
+                                onClick={() => onApproveLeave(req.id)}
+                                className="bg-[#059669] hover:bg-emerald-700 text-white font-bold text-[11px] px-3 py-1.5 rounded"
+                              >
+                                Setujui
+                              </button>
+                              <button
+                                onClick={() => onRejectLeave(req.id)}
+                                className="bg-[#E11D48] hover:bg-rose-700 text-white font-bold text-[11px] px-3 py-1.5 rounded"
+                              >
+                                Tolak
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 italic">
+                            {req.status === "Disetujui"
+                              ? "Telah Disetujui"
+                              : "Ditolak"}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 font-medium text-slate-400 italic text-[11px]">
+                        Belum ada riwayat cuti disetujui
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </>
-      ) : (
-        <>
-          <div className="card-container flex-1 min-h-[300px]">
-            <div className="flex-1 overflow-auto">
-              <table className="high-density-table whitespace-nowrap">
-                <thead>
-                  <tr>
-                    <th className="text-left font-normal text-[11px]">
-                      No Induk
-                    </th>
-                    <th className="text-left font-normal text-[11px]">
-                      Nama Karyawan
-                    </th>
-                    <th className="text-center font-normal text-[11px]">
-                      Hak Cuti Tahunan
-                    </th>
-                    <th className="text-center font-normal text-[11px]">
-                      Hak Cuti Khusus
-                    </th>
-                    <th className="text-center font-normal text-[11px]">
-                      Jml Cuti Tahunan
-                    </th>
-                    <th className="text-center font-normal text-[11px]">
-                      Sdh Diambil (Tahunan)
-                    </th>
-                    <th className="text-center font-normal text-[11px]">
-                      Sisa (Tahunan)
-                    </th>
-                    <th className="text-center font-normal text-[11px]">
-                      Riwayat Pengambilan Cuti
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {staff.map((member) => {
-                    const approvedLeaves = leaves.filter(
-                      (l) =>
-                        l.staffId === member.id && l.status === "Disetujui",
-                    );
-                    const historyCount = leaves.filter(
-                      (l) => l.staffId === member.id,
-                    ).length;
-                    return (
-                      <tr key={member.id} className="hover:bg-slate-50/50">
-                        <td className="font-mono font-normal text-[11px] text-slate-800">
-                          {member.id}
-                        </td>
-                        <td className="font-normal text-[11px] text-slate-800">
-                          {member.name}
-                        </td>
-                        <td className="text-center font-mono font-normal text-[11px] text-slate-800">
-                          12 Hari
-                        </td>
-                        <td className="text-center font-mono font-normal text-[11px] text-slate-800">
-                          {member.specialLeaveBalance !== undefined
-                            ? member.specialLeaveBalance
-                            : 12}{" "}
-                          Hari
-                        </td>
-                        <td className="text-center font-mono font-normal text-[11px] text-slate-800">
-                          12 Hari
-                        </td>
-                        <td className="text-center font-mono font-normal text-[11px] text-slate-600">
-                          {12 - member.leaveBalance} Hari
-                        </td>
-                        <td className="text-center font-mono font-normal text-[11px] text-emerald-600">
-                          {member.leaveBalance} Hari
-                        </td>
-                        <td className="text-center font-mono font-normal text-[11px] text-slate-800">
-                          {historyCount} Pengajuan ({approvedLeaves.length}{" "}
-                          Disetujui)
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
+        )}
+      </div>
 
       {/* Modal: Form Pengajuan Baru */}
       {isSubmitOpen && (
@@ -465,6 +420,7 @@ export default function Leave({
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                {/* Form fields identical to before... */}
                 {/* Staff Dropdown selector */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">
@@ -480,7 +436,8 @@ export default function Leave({
                   >
                     {staff.map((member) => (
                       <option key={member.id} value={member.id}>
-                        {member.name} (Sisa Kuota: {member.leaveBalance} Hari)
+                        {member.name} (Sisa Kuota: {member.leaveBalance ?? 12}{" "}
+                        Hari)
                       </option>
                     ))}
                   </select>
@@ -583,7 +540,7 @@ export default function Leave({
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 hover:shadow-sm transition-all"
+                    className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 hover:shadow-sm transition-all"
                   >
                     Kirim Pengajuan
                   </button>

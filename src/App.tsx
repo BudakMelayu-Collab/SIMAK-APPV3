@@ -16,10 +16,11 @@ import Inventory from "./components/Inventory";
 import Staff from "./components/Staff";
 import Leave from "./components/Leave";
 import DocumentArchiveView from "./components/Archive";
+import AiAssistant from "./components/AiAssistant";
 import Login from "./components/Login";
 
 // Importing Icons
-import { LayoutDashboard, Package, Users, CalendarDays, FileBox, ChevronLeft, ChevronRight, Menu, X, User as UserIcon, Bell, Building2, Clock, ArrowUpRight, LogOut, ShieldCheck, Crown } from "lucide-react";
+import { LayoutDashboard, Package, Users, CalendarDays, FileBox, ChevronLeft, ChevronRight, Menu, X, User as UserIcon, Bell, Building2, Clock, ArrowUpRight, LogOut, ShieldCheck, Crown, Bot } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { collection, onSnapshot, setDoc, updateDoc, deleteDoc, doc, writeBatch, getDocFromServer } from "firebase/firestore";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
@@ -269,6 +270,7 @@ export default function App() {
     { id: "staff", label: "Profil & Staf", icon: Users },
     { id: "leave", label: "Kontrol Cuti", icon: CalendarDays },
     { id: "archive", label: "Arsip Dokumen", icon: FileBox },
+    { id: "ai-assistant", label: "Asisten AI", icon: Bot },
   ];
 
   if (!isAuthenticated) {
@@ -639,6 +641,8 @@ export default function App() {
                   onDeleteDocument={handleDeleteDocument}
                 />
               )}
+
+              {activeTab === "ai-assistant" && <AiAssistant />}
             </motion.div>
           </AnimatePresence>
         </main>
