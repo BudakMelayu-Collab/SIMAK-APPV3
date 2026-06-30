@@ -310,12 +310,14 @@ export default function Inventory({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header section with Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-slate-700 to-slate-500 drop-shadow-sm uppercase relative">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
             Daftar Peralatan
-            <div className="absolute -bottom-1 left-0 w-12 h-1 bg-gradient-to-r from-slate-800 to-transparent rounded-full border-0"></div>
           </h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Manajemen aset, alokasi inventaris, dan status kondisi peralatan.
+          </p>
         </div>
 
         <div className="flex items-center space-x-3">
@@ -341,14 +343,17 @@ export default function Inventory({
             <span className="relative z-10 tracking-wider">
               {isImporting ? "Mengimpor..." : "Import Excel"}
             </span>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleImportExcel}
-            />
           </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleImportExcel}
+            onClick={(e) => {
+              (e.target as HTMLInputElement).value = "";
+            }}
+          />
           <button
             onClick={handleOpenAdd}
             className="relative overflow-hidden group bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-xs px-5 py-2 rounded-xl shadow-[0_4px_12px_-4px_rgba(15,23,42,0.6)] hover:shadow-[0_8px_16px_-4px_rgba(15,23,42,0.8)] transition-all flex items-center space-x-2 uppercase transform hover:-translate-y-0.5"

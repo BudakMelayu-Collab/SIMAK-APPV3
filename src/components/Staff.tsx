@@ -176,7 +176,7 @@ export default function Staff({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-            Direktori & Profil Staf
+            Profil & Staf
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             Relevansi tim kerja, status pegawai, kepemilikan inventaris, dan

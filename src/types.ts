@@ -50,7 +50,7 @@ export interface LeaveRequest {
 export interface DocumentArchive {
   id: string;
   name: string;
-  category: 'Laporan' | 'Legal' | 'Keuangan' | 'HR/SOP' | 'Memo/Umum';
+  category: string;
   uploadDate: string;
   fileSize: string;
   description: string;

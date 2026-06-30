@@ -52,7 +52,7 @@ export default function DocumentArchiveView({
     tanggal: "",
     perihal: "",
     name: "",
-    category: "Memo/Umum" as const,
+    category: "Arahan (Pengaturan)",
     fileSize: "",
     description: "",
     fileType: "pdf",
@@ -97,21 +97,21 @@ export default function DocumentArchiveView({
     }
   };
 
-  const categories = [
-    "Semua",
-    "Laporan",
-    "Legal",
-    "Keuangan",
-    "HR/SOP",
-    "Memo/Umum",
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  const baseCategories = [
+    "Arahan (Pengaturan)",
+    "Arahan (Penetapan)",
+    "Arahan (Penugasan)",
+    "Korespodensi (Internal)",
+    "Korespodensi (Eksternal)",
+    "Khusus",
   ];
-  const formCategories = [
-    "Laporan",
-    "Legal",
-    "Keuangan",
-    "HR/SOP",
-    "Memo/Umum",
-  ];
+
+  const formCategories = [...baseCategories, ...customCategories];
+  const categories = ["Semua", ...formCategories];
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -175,30 +175,39 @@ export default function DocumentArchiveView({
       const ext = filename.split(".").pop() || "pdf";
 
       // Guess category based on name
-      let guessedCategory: DocumentArchive["category"] = "Memo/Umum";
+      let guessedCategory: DocumentArchive["category"] = "Khusus";
       const nameLower = filename.toLowerCase();
-      if (nameLower.includes("laporan") || nameLower.includes("report")) {
-        guessedCategory = "Laporan";
-      } else if (
-        nameLower.includes("kontrak") ||
-        nameLower.includes("perjanjian") ||
-        nameLower.includes("legal")
-      ) {
-        guessedCategory = "Legal";
-      } else if (
-        nameLower.includes("uangan") ||
-        nameLower.includes("rekap") ||
-        nameLower.includes("keuangan") ||
-        nameLower.includes("finance")
-      ) {
-        guessedCategory = "Keuangan";
-      } else if (
+      if (
+        nameLower.includes("atur") ||
+        nameLower.includes("aturan") ||
         nameLower.includes("sop") ||
-        nameLower.includes("panduan") ||
-        nameLower.includes("karyawan") ||
-        nameLower.includes("hr")
+        nameLower.includes("pedoman")
       ) {
-        guessedCategory = "HR/SOP";
+        guessedCategory = "Arahan (Pengaturan)";
+      } else if (
+        nameLower.includes("tetap") ||
+        nameLower.includes("keputusan") ||
+        nameLower.includes("sk")
+      ) {
+        guessedCategory = "Arahan (Penetapan)";
+      } else if (
+        nameLower.includes("tugas") ||
+        nameLower.includes("st") ||
+        nameLower.includes("perintah")
+      ) {
+        guessedCategory = "Arahan (Penugasan)";
+      } else if (
+        nameLower.includes("internal") ||
+        nameLower.includes("memo") ||
+        nameLower.includes("nota")
+      ) {
+        guessedCategory = "Korespodensi (Internal)";
+      } else if (
+        nameLower.includes("eksternal") ||
+        nameLower.includes("surat") ||
+        nameLower.includes("undangan")
+      ) {
+        guessedCategory = "Korespodensi (Eksternal)";
       }
 
       onAddDocument({
@@ -263,7 +272,7 @@ export default function DocumentArchiveView({
       tanggal: "",
       perihal: "",
       name: "",
-      category: "Memo/Umum",
+      category: "Arahan (Pengaturan)",
       fileSize: "",
       description: "",
       fileType: "pdf",
@@ -310,12 +319,14 @@ export default function DocumentArchiveView({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Header section with Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-indigo-900 via-indigo-700 to-indigo-500 drop-shadow-sm uppercase relative">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
             Arsip Dokumen
-            <div className="absolute -bottom-1 left-0 w-12 h-1 bg-gradient-to-r from-indigo-800 to-transparent rounded-full border-0"></div>
           </h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Penyimpanan dokumen, file surat, dan arsip kepegawaian perusahaan.
+          </p>
         </div>
 
         <button
@@ -674,8 +685,8 @@ export default function DocumentArchiveView({
       {/* Manual Upload Indeksation Dialog */}
       {isUploadOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-md">Indeks Arsip Kertas Manual</h3>
               <button
                 onClick={() => setIsUploadOpen(false)}
@@ -685,7 +696,7 @@ export default function DocumentArchiveView({
               </button>
             </div>
 
-            <form onSubmit={submitManualForm} className="p-6 space-y-4">
+            <form onSubmit={submitManualForm} className="p-6 space-y-4 overflow-y-auto">
               <div className="p-3 bg-indigo-50/50 border border-indigo-100 text-indigo-950 rounded-lg text-xs leading-normal">
                 Gunakan menu ini jika berkas fisik dalam bentuk kertas keras
                 (hardcopy) dan Anda hanya ingin mencatatkan metadata penempatan
@@ -789,25 +800,80 @@ export default function DocumentArchiveView({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    Folder Kategori
+                  <label className="text-xs font-bold text-slate-700 flex justify-between items-center">
+                    <span>Folder Kategori</span>
+                    {!isAddingCategory && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingCategory(true)}
+                        className="text-indigo-600 hover:text-indigo-700 flex items-center space-x-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span className="text-[10px]">Folder Baru</span>
+                      </button>
+                    )}
                   </label>
-                  <select
-                    value={manualForm.category}
-                    onChange={(e) =>
-                      setManualForm({
-                        ...manualForm,
-                        category: e.target.value as any,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all font-sans cursor-pointer"
-                  >
-                    {formCategories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                  {isAddingCategory ? (
+                    <div className="flex flex-col space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Nama folder baru..."
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all font-sans"
+                        autoFocus
+                      />
+                      <div className="flex space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newCategoryName.trim()) {
+                              setCustomCategories([
+                                ...customCategories,
+                                newCategoryName.trim(),
+                              ]);
+                              setManualForm({
+                                ...manualForm,
+                                category: newCategoryName.trim(),
+                              });
+                              setNewCategoryName("");
+                              setIsAddingCategory(false);
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 font-semibold"
+                        >
+                          Simpan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingCategory(false);
+                            setNewCategoryName("");
+                          }}
+                          className="flex-1 px-3 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200 font-semibold"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <select
+                      value={manualForm.category}
+                      onChange={(e) =>
+                        setManualForm({
+                          ...manualForm,
+                          category: e.target.value as any,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all font-sans cursor-pointer"
+                    >
+                      {formCategories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -829,31 +895,14 @@ export default function DocumentArchiveView({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    Ukuran Taksiran Berkas
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: 1.5 MB atau 450 KB"
-                    value={manualForm.fileSize}
-                    onChange={(e) =>
-                      setManualForm({ ...manualForm, fileSize: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    Arsip Fisik (Upload File)
-                  </label>
-                  <input
-                    type="file"
-                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all font-sans file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">
+                  Arsip Fisik (Upload File)
+                </label>
+                <input
+                  type="file"
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all font-sans file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
               </div>
 
               <div className="space-y-1 relative">

@@ -4,10 +4,6 @@ import {
   InventoryItem,
   LeaveRequest,
   DocumentArchive,
-  INITIAL_STAFF,
-  INITIAL_INVENTORY,
-  INITIAL_LEAVE,
-  INITIAL_DOCUMENTS,
 } from "./types";
 
 // Importing Tab Components
@@ -41,49 +37,42 @@ import {
   Bot,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  collection,
-  onSnapshot,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  writeBatch,
-  getDocFromServer,
-} from "firebase/firestore";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { db, auth } from "./firebase";
-import { handleFirestoreError, OperationType } from "./firestoreUtils";
 
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, "test", "connection"));
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes("the client is offline")
-    ) {
-      console.error("Please check your Firebase configuration.");
-    }
-  }
-}
-testConnection();
+import { supabase } from "./supabase";
+import { User } from "@supabase/supabase-js";
+
+const navigationItems = [
+  { id: "dashboard", label: "Beranda", icon: LayoutDashboard },
+  { id: "inventory", label: "Inventaris", icon: Package },
+  { id: "staff", label: "Profil & Staf", icon: Users },
+  { id: "leave", label: "Kontrol Cuti", icon: CalendarDays },
+  { id: "archive", label: "Arsip Dokumen", icon: FileBox },
+  { id: "ai-assistant", label: "Asisten AI", icon: Bot },
+];
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
         setIsAuthenticated(true);
-        setCurrentUser(user);
+        setCurrentUser(session.user);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setIsAuthenticated(true);
+        setCurrentUser(session.user);
       } else {
         setIsAuthenticated(false);
         setCurrentUser(null);
       }
     });
-    return () => unsubscribe();
+
+    return () => subscription.unsubscribe();
   }, []);
   // Navigation active tab State
   const [activeTab, setActiveTab] = useState<string>("dashboard");
@@ -99,99 +88,76 @@ export default function App() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [documents, setDocuments] = useState<DocumentArchive[]>([]);
 
-  // Firebase Loaders
+  // Supabase Loaders
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const unsubs: (() => void)[] = [];
+    const fetchData = async () => {
+      const [{ data: staffData }, { data: invData }, { data: leaveData }, { data: docData }] = await Promise.all([
+        supabase.from("staff").select("*"),
+        supabase.from("inventory").select("*"),
+        supabase.from("leaves").select("*"),
+        supabase.from("documents").select("*")
+      ]);
+      if (staffData) setStaff(staffData);
+      if (invData) setInventory(invData);
+      if (leaveData) setLeaves(leaveData);
+      if (docData) setDocuments(docData);
+    };
 
-    // Load Staff
-    unsubs.push(
-      onSnapshot(
-        collection(db, "staff"),
-        (snapshot) => {
-          setStaff(
-            snapshot.docs.map(
-              (doc) => ({ id: doc.id, ...doc.data() }) as StaffProfile,
-            ),
-          );
-        },
-        (error) => handleFirestoreError(error, OperationType.GET, "staff"),
-      ),
-    );
+    fetchData();
 
-    // Load Inventory
-    unsubs.push(
-      onSnapshot(
-        collection(db, "inventory"),
-        (snapshot) => {
-          setInventory(
-            snapshot.docs.map(
-              (doc) => ({ id: doc.id, ...doc.data() }) as InventoryItem,
-            ),
-          );
-        },
-        (error) => handleFirestoreError(error, OperationType.GET, "inventory"),
-      ),
-    );
+    const channel = supabase.channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, () => {
+        supabase.from("staff").select("*").then(({ data }) => { if(data) setStaff(data) });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        supabase.from("inventory").select("*").then(({ data }) => { if(data) setInventory(data) });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaves' }, () => {
+        supabase.from("leaves").select("*").then(({ data }) => { if(data) setLeaves(data) });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+        supabase.from("documents").select("*").then(({ data }) => { if(data) setDocuments(data) });
+      })
+      .subscribe();
 
-    // Load Leaves
-    unsubs.push(
-      onSnapshot(
-        collection(db, "leaves"),
-        (snapshot) => {
-          setLeaves(
-            snapshot.docs.map(
-              (doc) => ({ id: doc.id, ...doc.data() }) as LeaveRequest,
-            ),
-          );
-        },
-        (error) => handleFirestoreError(error, OperationType.GET, "leaves"),
-      ),
-    );
-
-    // Load Documents
-    unsubs.push(
-      onSnapshot(
-        collection(db, "documents"),
-        (snapshot) => {
-          setDocuments(
-            snapshot.docs.map(
-              (doc) => ({ id: doc.id, ...doc.data() }) as DocumentArchive,
-            ),
-          );
-        },
-        (error) => handleFirestoreError(error, OperationType.GET, "documents"),
-      ),
-    );
-
-    return () => unsubs.forEach((unsub) => unsub());
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    const currentTab = navigationItems.find((i) => i.id === activeTab);
+    if (currentTab) {
+      document.title = `${currentTab.label} - SIMAK`;
+    }
+  }, [activeTab]);
 
   // --- Handlers for Inventory ---
   const handleAddInventory = async (item: Omit<InventoryItem, "id">) => {
     try {
       const newId = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
-      await setDoc(doc(db, "inventory", newId), item);
+      await supabase.from("inventory").insert({ id: newId, ...item });
     } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, "inventory");
+      console.error(e);
     }
   };
 
   const handleUpdateInventory = async (updatedItem: InventoryItem) => {
     try {
       const { id, ...data } = updatedItem;
-      await updateDoc(doc(db, "inventory", id), data);
+      await supabase.from("inventory").update(data).eq("id", id);
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, "inventory");
+      console.error(e);
     }
   };
 
   const handleDeleteInventory = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "inventory", id));
+      await supabase.from("inventory").delete().eq("id", id);
     } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, "inventory");
+      console.error(e);
     }
   };
 
@@ -199,58 +165,47 @@ export default function App() {
   const handleAddStaff = async (profile: Omit<StaffProfile, "id">) => {
     try {
       const newId = `STF-0${staff.length + 1}`;
-      await setDoc(doc(db, "staff", newId), profile);
+      await supabase.from("staff").insert({ id: newId, ...profile });
     } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, "staff");
+      console.error(e);
     }
   };
 
   const handleUpdateStaff = async (updatedProfile: StaffProfile) => {
     try {
       const { id, ...data } = updatedProfile;
-      const batch = writeBatch(db);
-
-      batch.update(doc(db, "staff", id), data);
-
-      inventory.forEach((item) => {
-        if (item.assignedToId === id) {
-          batch.update(doc(db, "inventory", item.id), {
-            assignedToName: updatedProfile.name,
-          });
-        }
-      });
-
-      await batch.commit();
+      await supabase.from("staff").update(data).eq("id", id);
+      
+      const relatedInv = inventory.filter(item => item.assignedToId === id);
+      if (relatedInv.length > 0) {
+        await Promise.all(relatedInv.map(item => 
+          supabase.from("inventory").update({ assignedToName: updatedProfile.name }).eq("id", item.id)
+        ));
+      }
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, "staff");
+      console.error(e);
     }
   };
 
   const handleDeleteStaff = async (id: string) => {
     try {
-      const batch = writeBatch(db);
+      await supabase.from("staff").delete().eq("id", id);
 
-      batch.delete(doc(db, "staff", id));
+      const relatedInv = inventory.filter(item => item.assignedToId === id);
+      if (relatedInv.length > 0) {
+        await Promise.all(relatedInv.map(item => 
+          supabase.from("inventory").update({ assignedToId: null, assignedToName: null, status: "Tersedia" }).eq("id", item.id)
+        ));
+      }
 
-      inventory.forEach((item) => {
-        if (item.assignedToId === id) {
-          batch.update(doc(db, "inventory", item.id), {
-            assignedToId: null,
-            assignedToName: null,
-            status: "Tersedia",
-          });
-        }
-      });
-
-      leaves.forEach((l) => {
-        if (l.staffId === id) {
-          batch.delete(doc(db, "leaves", l.id));
-        }
-      });
-
-      await batch.commit();
+      const relatedLeaves = leaves.filter(l => l.staffId === id);
+      if (relatedLeaves.length > 0) {
+        await Promise.all(relatedLeaves.map(l => 
+          supabase.from("leaves").delete().eq("id", l.id)
+        ));
+      }
     } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, "staff");
+      console.error(e);
     }
   };
 
@@ -261,9 +216,9 @@ export default function App() {
     try {
       const newId = `LV-${Math.floor(100 + Math.random() * 900)}`;
       const requestDate = new Date().toISOString().split("T")[0];
-      await setDoc(doc(db, "leaves", newId), { ...req, requestDate });
+      await supabase.from("leaves").insert({ id: newId, ...req, requestDate });
     } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, "leaves");
+      console.error(e);
     }
   };
 
@@ -272,38 +227,33 @@ export default function App() {
     if (!req) return;
 
     try {
-      const batch = writeBatch(db);
-
-      batch.update(doc(db, "leaves", id), { status: "Disetujui" });
+      await supabase.from("leaves").update({ status: "Disetujui" }).eq("id", id);
 
       const member = staff.find((s) => s.id === req.staffId);
       if (member) {
         const newBalance = Math.max(0, member.leaveBalance - req.durationDays);
-        batch.update(doc(db, "staff", member.id), {
+        await supabase.from("staff").update({
           leaveBalance: newBalance,
           status: "Cuti",
-        });
+        }).eq("id", member.id);
       }
 
-      inventory.forEach((item) => {
-        if (item.assignedToId === req.staffId) {
-          batch.update(doc(db, "inventory", item.id), {
-            assignedToName: `${req.staffName} (Sedang Cuti)`,
-          });
-        }
-      });
-
-      await batch.commit();
+      const relatedInv = inventory.filter(item => item.assignedToId === req.staffId);
+      if (relatedInv.length > 0) {
+        await Promise.all(relatedInv.map(item => 
+          supabase.from("inventory").update({ assignedToName: `${req.staffName} (Sedang Cuti)` }).eq("id", item.id)
+        ));
+      }
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, "leaves");
+      console.error(e);
     }
   };
 
   const handleRejectLeave = async (id: string) => {
     try {
-      await updateDoc(doc(db, "leaves", id), { status: "Ditolak" });
+      await supabase.from("leaves").update({ status: "Ditolak" }).eq("id", id);
     } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, "leaves");
+      console.error(e);
     }
   };
 
@@ -314,29 +264,21 @@ export default function App() {
     try {
       const newId = `DOC-${Math.floor(1000 + Math.random() * 9000)}`;
       const uploadDate = new Date().toISOString().split("T")[0];
-      await setDoc(doc(db, "documents", newId), { ...docReq, uploadDate });
+      await supabase.from("documents").insert({ id: newId, ...docReq, uploadDate });
     } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, "documents");
+      console.error(e);
     }
   };
 
   const handleDeleteDocument = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "documents", id));
+      await supabase.from("documents").delete().eq("id", id);
     } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, "documents");
+      console.error(e);
     }
   };
 
   // Switch Sidebar tabs listing
-  const navigationItems = [
-    { id: "dashboard", label: "Beranda", icon: LayoutDashboard },
-    { id: "inventory", label: "Inventaris", icon: Package },
-    { id: "staff", label: "Profil & Staf", icon: Users },
-    { id: "leave", label: "Kontrol Cuti", icon: CalendarDays },
-    { id: "archive", label: "Arsip Dokumen", icon: FileBox },
-    { id: "ai-assistant", label: "Asisten AI", icon: Bot },
-  ];
 
   if (!isAuthenticated) {
     return <Login onLogin={() => setIsAuthenticated(true)} />;
@@ -560,7 +502,7 @@ export default function App() {
               >
                 <div className="text-right hidden sm:block">
                   <span className="text-[14px] font-bold text-slate-800 block leading-none group-hover:text-blue-600 transition-colors">
-                    {currentUser?.displayName || "Admin"}
+                    {currentUser?.user_metadata?.full_name || "Admin"}
                   </span>
                   <div className="flex items-center justify-end space-x-1 mt-1 text-amber-500">
                     <ShieldCheck className="w-3 h-3" />
@@ -572,7 +514,7 @@ export default function App() {
                 <div className="relative">
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden shadow-lg shadow-blue-500/10 ring-2 ring-white group-hover:ring-blue-500/30 transition-all bg-gradient-to-br from-blue-50 to-indigo-50">
                     <img
-                      src={currentUser?.photoURL || "https://i.pravatar.cc/150"}
+                      src={currentUser?.user_metadata?.avatar_url || "https://i.pravatar.cc/150"}
                       alt="Admin Profile"
                       className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-500"
                     />
@@ -608,7 +550,7 @@ export default function App() {
                           <div className="w-12 h-12 rounded-xl overflow-hidden ring-2 ring-white/20">
                             <img
                               src={
-                                currentUser?.photoURL ||
+                                currentUser?.user_metadata?.avatar_url ||
                                 "https://i.pravatar.cc/150"
                               }
                               alt="Admin Profile"
@@ -617,7 +559,7 @@ export default function App() {
                           </div>
                           <div>
                             <span className="font-bold text-sm block">
-                              {currentUser?.displayName || "Admin"}
+                              {currentUser?.user_metadata?.full_name || "Admin"}
                             </span>
                             <span className="text-[10px] text-blue-300 font-mono tracking-widest uppercase">
                               Pusat Otoritas
@@ -630,7 +572,7 @@ export default function App() {
                         <button
                           onClick={async () => {
                             setIsProfileDropdownOpen(false);
-                            await signOut(auth);
+                            await supabase.auth.signOut();
                             setIsAuthenticated(false);
                           }}
                           className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-red-600 text-sm font-semibold transition-colors group"
@@ -666,7 +608,7 @@ export default function App() {
                   leaves={leaves}
                   documents={documents}
                   userName={
-                    currentUser?.displayName || currentUser?.email || undefined
+                    currentUser?.user_metadata?.full_name || currentUser?.email || undefined
                   }
                   onNavigate={(tab) => setActiveTab(tab)}
                   onApproveLeave={handleApproveLeave}

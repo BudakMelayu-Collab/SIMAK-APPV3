@@ -1,23 +1,38 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
 import { Loader2, ArrowRight } from "lucide-react";
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { auth } from "../firebase";
+import { supabase } from "../supabase";
 
 export default function Login({ onLogin }: { onLogin: () => void }) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorInfo(null);
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      onLogin();
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        setErrorInfo("Pendaftaran berhasil. Silakan masuk atau periksa email Anda.");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        onLogin();
+      }
     } catch (error: any) {
       setErrorInfo(error.message || "Failed to authenticate.");
+    } finally {
       setIsLoading(false);
     }
   };
@@ -60,31 +75,70 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleAuth} className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  placeholder="admin@baznas.go.id"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            </div>
             
             {errorInfo && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl text-center">
+              <div className={`text-xs p-3 rounded-xl text-center border ${isSignUp && !errorInfo.toLowerCase().includes("failed") && !errorInfo.toLowerCase().includes("invalid") ? "bg-green-500/10 border-green-500/20 text-green-400" : "bg-red-500/10 border-red-500/20 text-red-400"}`}>
                 {errorInfo}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl px-4 py-4 font-bold tracking-wide flex items-center justify-center space-x-2 transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] disabled:opacity-70 group"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Otentikasi...</span>
-                </>
-              ) : (
-                <>
-                  <span>Masuk dengan Google</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </button>
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl px-4 py-4 font-bold tracking-wide flex items-center justify-center space-x-2 transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] disabled:opacity-70 group"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Otentikasi...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{isSignUp ? "Daftar Akun" : "Masuk ke SIMAK"}</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </button>
+            </div>
+            
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setErrorInfo(null);
+                }}
+                className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                {isSignUp ? "Sudah punya akun? Masuk" : "Belum punya akun? Daftar"}
+              </button>
+            </div>
           </form>
         </div>
 

@@ -124,7 +124,7 @@ export default function Dashboard({
         <div className="absolute left-1/3 bottom-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-2xl -ml-20 -mb-20"></div>
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
+          <div className="flex-1">
             <span className="bg-indigo-500/20 text-indigo-300 font-mono text-xs uppercase font-semibold px-3 py-1 rounded-full border border-indigo-500/30">
               Operations Status • Staf & Aset
             </span>
@@ -133,27 +133,27 @@ export default function Dashboard({
             </h1>
             <p className="mt-2 text-slate-300 max-w-xl text-sm leading-relaxed">
               Sistem Manajemen Aset Baznas.
-              <br />
-              <span className="font-semibold text-white/90">
+              <br className="hidden sm:block" />
+              <span className="font-semibold text-white/90 sm:ml-1">
                 Aset Terdata, Amanah Terjaga.
               </span>
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-4 min-w-[140px] text-center shadow-sm">
-              <span className="text-xs text-slate-300 font-medium uppercase tracking-wider block">
+          <div className="flex flex-row flex-wrap sm:flex-nowrap gap-3 sm:gap-4 shrink-0 mt-2 md:mt-0">
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3 sm:p-4 flex-1 min-w-[130px] text-center shadow-sm">
+              <span className="text-[10px] sm:text-xs text-slate-300 font-medium uppercase tracking-wider block">
                 Tahun Fiskal
               </span>
-              <span className="text-2xl font-black font-mono tracking-wider block mt-1">
+              <span className="text-xl sm:text-2xl font-black font-mono tracking-wider block mt-1">
                 2026
               </span>
             </div>
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-4 min-w-[140px] text-center shadow-sm">
-              <span className="text-xs text-slate-300 font-medium uppercase tracking-wider block">
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3 sm:p-4 flex-1 min-w-[130px] text-center shadow-sm">
+              <span className="text-[10px] sm:text-xs text-slate-300 font-medium uppercase tracking-wider block">
                 Lokasi Utama
               </span>
-              <span className="text-lg font-bold block mt-1">Siak, ID</span>
+              <span className="text-base sm:text-lg font-bold block mt-1">Siak, ID</span>
             </div>
           </div>
         </div>
