@@ -34,6 +34,7 @@ export default function Inventory({
 }: InventoryProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState("");
@@ -78,12 +79,10 @@ export default function Inventory({
     "Alat Tulis Kantor",
     "Lainnya",
   ];
+  
   const statuses = [
     "Semua",
-    "Tersedia",
-    "Digunakan",
-    "Rusak",
-    "Dalam Perbaikan",
+    ...Array.from(new Set(inventory.map(i => i.status))).filter(Boolean)
   ];
 
   // Filter logic
@@ -195,16 +194,16 @@ export default function Inventory({
     // Generate template data
     const templateData = [
       {
-        Nama: "Laptop Asus Vivobook",
-        JenisAset: "Elektronik",
-        Merk: "Asus",
-        Kode: "INV-1001",
-        Kategori: "IT",
-        Jumlah: 10,
-        Harga: 15000000,
-        Status: "Tersedia",
-        Lokasi: "Gudang Utama",
-        Tanggal: "2024-05-20",
+        "Jenis Aset": "Elektronik",
+        "Nama": "Laptop Asus Vivobook",
+        "Merk": "Asus",
+        "Kode": "INV-1001",
+        "Kategori": "IT",
+        "Jumlah": 10,
+        "Harga Satuan": 15000000,
+        "Kondisi": "Tersedia",
+        "Lokasi Penempatan": "Gudang Utama",
+        "Tahun": "2024",
       },
     ];
 
@@ -228,52 +227,62 @@ export default function Inventory({
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
       let successCount = 0;
+      setImportProgress({ current: 0, total: jsonData.length });
+
       // Basic mapping: Maps excel column names to `Omit<InventoryItem, 'id'>`
-      const promises = jsonData.map(async (row) => {
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i];
         // More robust key matching by checking keys dynamically if needed,
         // but let's check common casing:
-        const name = row.name || row.Nama || row.nama || row.NAME || row.Name;
-        if (!name) return; // Skip empty rows
+        const name = row.name || row.Nama || row.nama || row["Nama Aset / Merk"] || row.NAME || row.Name;
+        if (!name) {
+            setImportProgress({ current: i + 1, total: jsonData.length });
+            continue; // Skip empty rows
+        }
 
         let dateStr = new Date().toISOString().split("T")[0];
-        const rawDate = row.purchaseDate || row.Tanggal || row.tanggal;
+        const rawDate = row.purchaseDate || row.Tahun || row.tahun || row.Tanggal || row.tanggal;
         if (rawDate instanceof Date) {
           dateStr = rawDate.toISOString().split("T")[0];
         } else if (typeof rawDate === "string" && rawDate.trim() !== "") {
-          dateStr = rawDate.split("T")[0]; // basic safety
+          // If it's a 4 digit year, we can handle it
+          if (rawDate.trim().length === 4) {
+            dateStr = `${rawDate.trim()}-01-01`;
+          } else {
+            dateStr = rawDate.split("T")[0]; // basic safety
+          }
         } else if (typeof rawDate === "number") {
-          dateStr = String(rawDate);
+          // Check if it looks like a year (e.g. 2024)
+          if (rawDate > 1900 && rawDate < 2100) {
+            dateStr = `${rawDate}-01-01`;
+          } else {
+            const jsDate = new Date((rawDate - 25569) * 86400 * 1000);
+            if (!isNaN(jsDate.getTime())) {
+               dateStr = jsDate.toISOString().split("T")[0];
+            }
+          }
         }
 
-        const conditionVal = row.condition || row.Kondisi || row.kondisi;
-        let statusVal = String(row.status || row.Status || "Tersedia").trim();
-        const validStatuses = [
-          "Tersedia",
-          "Digunakan",
-          "Rusak",
-          "Dalam Perbaikan",
-        ];
-        if (!validStatuses.includes(statusVal)) {
-          statusVal = "Tersedia";
-        }
+        let statusVal = String(row.status || row.Status || row.Kondisi || row.kondisi || "Tersedia").trim();
 
         let qty = parseInt(row.quantity || row.Jumlah || row.jumlah, 10);
         if (isNaN(qty)) qty = 1;
 
         let price = Number(
-          row.unitPrice || row.price || row.Harga || row.harga,
+          row.unitPrice || row.price || row["Harga Satuan"] || row.Harga || row.harga,
         );
         if (isNaN(price)) price = 0;
 
         const newItem: Omit<InventoryItem, "id"> = {
           assetType: String(
-            row.assetType || row.JenisAset || row.Jenis || row.jenis || "",
+            row.assetType || row["Jenis Aset"] || row.JenisAset || row.Jenis || row.jenis || "",
           ),
           name: String(name || "Tanpa Nama"),
           brand: String(row.brand || row.Merk || row.merk || ""),
           code: String(
             row.code ||
               row.Kode ||
+              row["Kode Aset (No. Seri)"] ||
               row.kode ||
               `INV-${Math.floor(100 + Math.random() * 9000)}`,
           ),
@@ -284,16 +293,15 @@ export default function Inventory({
           unitPrice: price,
           status: statusVal as any,
           location: String(
-            row.location || row.Lokasi || row.lokasi || "Gudang",
+            row.location || row["Lokasi Penempatan"] || row.Lokasi || row.lokasi || "Gudang",
           ).trim(),
           purchaseDate: dateStr.trim(),
         };
-        // Add condition if schema requires it optionally or something, wait condition wasn't there before
+        
         await onAddInventory(newItem);
         successCount++;
-      });
-
-      await Promise.all(promises);
+        setImportProgress({ current: i + 1, total: jsonData.length });
+      }
 
       alert(`Berhasil mengimpor ${successCount} data dari Excel!`);
     } catch (error) {
@@ -308,7 +316,33 @@ export default function Inventory({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col h-full space-y-4 relative">
+      {/* Progress Overlay */}
+      {isImporting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center">
+            <RefreshCw className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Mengimpor Excel</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Memproses baris ke-{importProgress.current} dari {importProgress.total}
+            </p>
+            <div className="w-full bg-slate-100 rounded-full h-2 mb-2 overflow-hidden">
+              <div
+                className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
+                style={{
+                  width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%`,
+                }}
+              ></div>
+            </div>
+            <div className="text-xs font-bold text-emerald-600">
+              {importProgress.total > 0
+                ? Math.round((importProgress.current / importProgress.total) * 100)
+                : 0}
+              %
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header section with Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -678,20 +712,23 @@ export default function Inventory({
                   <label className="text-xs font-bold text-slate-700">
                     Status Awal
                   </label>
-                  <select
+                  <input
+                    type="text"
+                    list="kondisi-options"
                     value={formData.status}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        status: e.target.value as any,
+                        status: e.target.value,
                       })
                     }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
-                  >
-                    <option value="Tersedia">Tersedia</option>
-                    <option value="Dalam Perbaikan">Dalam Perbaikan</option>
-                    <option value="Rusak">Rusak</option>
-                  </select>
+                  />
+                  <datalist id="kondisi-options">
+                    <option value="Tersedia" />
+                    <option value="Dalam Perbaikan" />
+                    <option value="Rusak" />
+                  </datalist>
                 </div>
               </div>
 
@@ -879,21 +916,24 @@ export default function Inventory({
                   <label className="text-xs font-bold text-slate-700">
                     Kondisi
                   </label>
-                  <select
+                  <input
+                    type="text"
+                    list="kondisi-options-edit"
                     value={formData.status}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        status: e.target.value as any,
+                        status: e.target.value,
                       })
                     }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
-                  >
-                    <option value="Tersedia">Tersedia</option>
-                    <option value="Digunakan">Digunakan (Oleh Staf)</option>
-                    <option value="Dalam Perbaikan">Dalam Perbaikan</option>
-                    <option value="Rusak">Rusak</option>
-                  </select>
+                  />
+                  <datalist id="kondisi-options-edit">
+                    <option value="Tersedia" />
+                    <option value="Digunakan" />
+                    <option value="Dalam Perbaikan" />
+                    <option value="Rusak" />
+                  </datalist>
                 </div>
               </div>
 

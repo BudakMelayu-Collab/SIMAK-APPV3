@@ -43,16 +43,16 @@ export default function Dashboard({
   const staffOnLeave = staff.filter((s) => s.status === "Cuti").length;
   const activeStaff = staff.filter((s) => s.status === "Aktif").length;
 
-  const totalInventory = inventory.reduce(
-    (acc, curr) => acc + curr.quantity,
-    0,
-  );
-  const itemsAssigned = inventory
-    .filter((item) => item.status === "Digunakan")
-    .reduce((acc, curr) => acc + curr.quantity, 0);
-  const itemsDamaged = inventory
-    .filter((item) => item.status === "Rusak")
-    .reduce((acc, curr) => acc + curr.quantity, 0);
+  const totalInventory = inventory.length;
+  const layakPakai = inventory.filter(
+    (item) => item.status.toLowerCase() === "layak pakai" || item.status.toLowerCase() === "baik" || item.status.toLowerCase() === "tersedia"
+  ).length;
+  const rusakBerat = inventory.filter(
+    (item) => item.status.toLowerCase() === "rusak berat" || item.status.toLowerCase() === "rusak"
+  ).length;
+  const rusakRingan = inventory.filter(
+    (item) => item.status.toLowerCase() === "rusak ringan" || item.status.toLowerCase() === "dalam perbaikan"
+  ).length;
 
   const pendingLeaves = leaves.filter((l) => l.status === "Pending");
   const totalLeavesApproved = leaves.filter(
@@ -243,7 +243,7 @@ export default function Dashboard({
         </div>
         <div className="mt-4 flex items-center justify-between text-xs border-t border-slate-100 pt-3 text-slate-500">
           <span className="font-medium">
-            {itemsAssigned} Digunakan • {itemsDamaged} Rusak
+            {layakPakai} Layak Pakai • {rusakBerat} Rusak Berat • {rusakRingan} Rusak Ringan
           </span>
           <span className="text-violet-600 font-semibold group-hover:underline inline-flex items-center">
             Detail <ChevronRight className="w-3.5 h-3.5 ml-1" />
@@ -450,25 +450,18 @@ export default function Dashboard({
           <h3 className="font-semibold text-sm text-slate-800 uppercase tracking-wider">
             Kondisi Inventaris
           </h3>
-          <span className="text-xs font-bold text-slate-400 font-mono uppercase bg-slate-50 px-2.5 py-1 rounded-md">
-            Rasio Distribusi
-          </span>
         </div>
 
         <div className="space-y-4 py-2">
-          {/* Tersedia (Baik) */}
+          {/* Layak Pakai */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-600 font-medium font-sans">
-                Bagus & Tersedia
+                Layak Pakai
               </span>
               <span className="text-slate-900 font-bold font-mono">
                 {inventory.length > 0
-                  ? Math.round(
-                      (inventory.filter((i) => i.status === "Tersedia").length /
-                        inventory.length) *
-                        100,
-                    )
+                  ? Math.round((layakPakai / inventory.length) * 100)
                   : 0}
                 %
               </span>
@@ -477,66 +470,53 @@ export default function Dashboard({
               <div
                 className="bg-emerald-500 h-full rounded-full transition-all duration-1000 ease-out"
                 style={{
-                  width: `${inventory.length > 0 ? (inventory.filter((i) => i.status === "Tersedia").length / inventory.length) * 100 : 0}%`,
+                  width: `${inventory.length > 0 ? (layakPakai / inventory.length) * 100 : 0}%`,
                 }}
               ></div>
             </div>
           </div>
 
-          {/* Business Use */}
+          {/* Rusak Ringan */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-600 font-medium font-sans">
-                Sedang Digunakan Staf
+                Rusak Ringan
               </span>
               <span className="text-slate-900 font-bold font-mono">
                 {inventory.length > 0
-                  ? Math.round(
-                      (inventory.filter((i) => i.status === "Digunakan")
-                        .length /
-                        inventory.length) *
-                        100,
-                    )
+                  ? Math.round((rusakRingan / inventory.length) * 100)
                   : 0}
                 %
               </span>
             </div>
             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
               <div
-                className="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out delay-150"
+                className="bg-amber-500 h-full rounded-full transition-all duration-1000 ease-out delay-150"
                 style={{
-                  width: `${inventory.length > 0 ? (inventory.filter((i) => i.status === "Digunakan").length / inventory.length) * 100 : 0}%`,
+                  width: `${inventory.length > 0 ? (rusakRingan / inventory.length) * 100 : 0}%`,
                 }}
               ></div>
             </div>
           </div>
 
-          {/* Repair / Damaged */}
+          {/* Rusak Berat */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-600 font-medium font-sans">
-                Rusak atau Masalah Fisik
+                Rusak Berat
               </span>
               <span className="text-slate-900 font-bold font-mono">
                 {inventory.length > 0
-                  ? Math.round(
-                      (inventory.filter(
-                        (i) =>
-                          i.status === "Rusak" ||
-                          i.status === "Dalam Perbaikan",
-                      ).length /
-                        inventory.length) *
-                        100,
-                    )
+                  ? Math.round((rusakBerat / inventory.length) * 100)
                   : 0}
                 %
               </span>
             </div>
             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
               <div
-                className="bg-amber-500 h-full rounded-full transition-all duration-1000 ease-out delay-300"
+                className="bg-red-500 h-full rounded-full transition-all duration-1000 ease-out delay-300"
                 style={{
-                  width: `${inventory.length > 0 ? (inventory.filter((i) => i.status === "Rusak" || i.status === "Dalam Perbaikan").length / inventory.length) * 100 : 0}%`,
+                  width: `${inventory.length > 0 ? (rusakBerat / inventory.length) * 100 : 0}%`,
                 }}
               ></div>
             </div>

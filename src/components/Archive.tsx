@@ -20,6 +20,8 @@ import {
   Calendar,
   ShieldCheck,
   Eye,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 
 interface ArchiveProps {
@@ -43,6 +45,7 @@ export default function DocumentArchiveView({
   // Dialog State
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAlertDownload, setIsAlertDownload] = useState<string | null>(null);
+  const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
 
   // Manual Form State
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -425,6 +428,24 @@ export default function DocumentArchiveView({
             ))}
           </select>
         </div>
+
+        {/* Layout Toggle */}
+        <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200 shrink-0">
+          <button
+            onClick={() => setLayoutMode("grid")}
+            className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${layoutMode === "grid" ? "bg-white shadow-sm text-indigo-600" : "text-slate-500 hover:bg-slate-200/50"}`}
+            title="Tampilan Grid"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setLayoutMode("list")}
+            className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${layoutMode === "list" ? "bg-white shadow-sm text-indigo-600" : "text-slate-500 hover:bg-slate-200/50"}`}
+            title="Tampilan List"
+          >
+            <List className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Documents Grid / Layout cards */}
@@ -439,241 +460,176 @@ export default function DocumentArchiveView({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className={layoutMode === "grid" ? "grid grid-cols-1 xl:grid-cols-2 gap-6" : "flex flex-col space-y-4"}>
             {filteredDocs.map((doc) => {
               const baseCat =
                 doc.category === "HR/SOP" ? "SOP Kantor" : doc.category;
-              const dateStr =
-                doc.uploadDate || new Date().toISOString().split("T")[0];
+              
+              // Extracted values
+              let docDateStr = doc.uploadDate || new Date().toISOString().split("T")[0];
+              let docJenisNaskah = "Surat Dinas";
+              let docPrihal = doc.name.replace(/\.[^/.]+$/, ""); // remove extension
+              let docArsipType = "Arsip Umum";
+              let docDescription = doc.description || "Pencatatan rincian dokumen diarsipkan secara manual.";
 
-              // Helper to infer "Prihal" and "Jenis" if the name or description matches our manual input.
-              let prihal = doc.name.replace(/\.[^/.]+$/, ""); // remove extension
-              if (prihal.includes("_")) {
-                prihal = prihal.split("_").slice(1).join(" ") || prihal;
+              if (doc.description && doc.description.includes(" - Tanggal: ")) {
+                const descParts = doc.description.split(" - Tanggal: ");
+                docArsipType = descParts[0];
+                const restPart = descParts.slice(1).join(" - Tanggal: ");
+                if (restPart && restPart.includes(" - ")) {
+                  docDateStr = restPart.split(" - ")[0];
+                  docDescription = restPart.split(" - ").slice(1).join(" - ");
+                } else {
+                  docDateStr = restPart;
+                  docDescription = "-";
+                }
               }
-              if (prihal.length > 30) prihal = prihal.substring(0, 30) + "...";
 
-              let jenisNaskah = "Dinas Masuk";
-              if (doc.description.includes("Naskah Dinas Keluar"))
-                jenisNaskah = "Dinas Keluar";
-              if (doc.description.includes("Arsip Umum")) jenisNaskah = "Umum";
+              if (doc.name.includes("_")) {
+                const nameParts = doc.name.replace(/\.[^/.]+$/, "").split("_");
+                docJenisNaskah = nameParts[0].replace(/-/g, " ");
+                docPrihal = nameParts.slice(1).join(" ") || doc.name.replace(/\.[^/.]+$/, "");
+              } else if (doc.category === "Arahan (Pengaturan)" || doc.category === "Arahan (Penetapan)" || doc.category === "Arahan (Penugasan)") {
+                docJenisNaskah = "Naskah Arahan";
+              } else if (doc.category.includes("Korespodensi")) {
+                docJenisNaskah = "Surat Korespodensi";
+              }
 
-              const mockupPihak =
-                doc.name.length % 2 === 0
-                  ? "Budi Santoso"
-                  : "M. Sanusi Bernawa";
-              const mockupValue =
-                doc.category === "Keuangan" ? "Rp 15.000.000" : "$ -";
-              const mockupRisiko =
-                doc.category === "Legal" ? "TINGGI" : "RENDAH";
-              const isRisikoTinggi = mockupRisiko === "TINGGI";
-
-              const aiSummary =
-                doc.description && doc.description.length > 20
-                  ? doc.description
-                  : `${doc.name} merupakan bagian dari ${baseCat} yang telah diajukan dan diarsipkan secara digital. Dokumen administrasi resmi ini diterbitkan pada tanggal ${dateStr}.`;
-
-              const saranTags = [
-                "pengadaan laptop",
-                "sop kantor",
-                "naskah dinas",
-                "administrasi",
-              ];
+              if (docPrihal.length > 40) docPrihal = docPrihal.substring(0, 40) + "...";
 
               return (
                 <div
                   key={doc.id}
-                  className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col space-y-5 shadow-sm transition-all hover:shadow-md h-full relative"
+                  className={`bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all relative ${layoutMode === "grid" ? "rounded-2xl p-6 flex flex-col space-y-5 h-full" : "rounded-xl p-5 flex flex-col sm:flex-row sm:items-start space-y-4 sm:space-y-0 sm:space-x-6"}`}
                 >
-                  {/* Header Row */}
-                  <div className="flex items-center justify-between">
-                    <div className="bg-indigo-50 text-indigo-700 font-bold px-3 py-1 rounded-md text-xs uppercase tracking-wider">
-                      {baseCat}
-                    </div>
-                    <div className="flex items-center space-x-3 text-slate-400">
-                      <span className="text-xs font-mono">{dateStr}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (
-                            confirm(`Hapus dokumen "${doc.name}" dari arsip?`)
-                          ) {
-                            onDeleteDocument(doc.id);
-                          }
-                        }}
-                        className="hover:text-rose-500 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Title */}
-                  <h3 className="text-xl font-extrabold text-slate-800 leading-tight">
-                    Surat Keputusan
-                  </h3>
-
-                  {/* Meta Info Box */}
-                  <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4 grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                        Prihal
-                      </p>
-                      <p className="text-sm font-semibold text-slate-700">
-                        {prihal}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                        Jenis Naskah
-                      </p>
-                      <p className="text-sm font-semibold text-slate-700 flex items-center space-x-2">
-                        <Inbox className="w-4 h-4 text-blue-500" />
-                        <span>{jenisNaskah}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Berkas Naskah Text */}
-                  <h4 className="text-[13px] font-medium text-slate-500 pt-1">
-                    Berkas Naskah
-                  </h4>
-
-                  {/* File Info Card */}
-                  <div className="border border-dashed border-slate-300 bg-slate-50/30 rounded-xl p-3 flex items-center justify-between">
-                    <div className="flex items-center space-x-3 overflow-hidden pr-3">
-                      <div className="bg-blue-50 text-blue-600 font-extrabold text-[10px] px-2.5 py-1.5 rounded-lg shrink-0">
-                        {doc.fileType.toUpperCase()}
+                  <div className={layoutMode === "grid" ? "flex-1 flex flex-col" : "flex-1 min-w-0"}>
+                    {/* Header Row */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-2">
+                        <div className="bg-indigo-50 text-indigo-700 font-bold px-3 py-1 rounded-md text-[10px] sm:text-xs uppercase tracking-wider">
+                          {baseCat}
+                        </div>
+                        <div className="bg-slate-100 text-slate-600 font-bold px-3 py-1 rounded-md text-[10px] sm:text-xs tracking-wider">
+                          {docArsipType}
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-700 truncate">
-                          {doc.name}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {doc.fileSize}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        triggerSimulatedDownload(doc.name);
-                      }}
-                      className="shrink-0 p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-2">
-                    {doc.tags && doc.tags.length > 0 ? (
-                      doc.tags.map((t) => (
-                        <span
-                          key={t}
-                          className="flex items-center space-x-1.5 border border-slate-200 text-slate-600 bg-white px-2 py-1 rounded text-[10px] font-semibold uppercase"
+                      <div className="flex items-center space-x-3 text-slate-400">
+                        <span className="text-xs font-mono">{docDateStr}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Hapus dokumen "${doc.name}" dari arsip?`)) {
+                              onDeleteDocument(doc.id);
+                            }
+                          }}
+                          className="hover:text-rose-500 transition-colors"
                         >
-                          <Tag className="w-3 h-3 text-slate-400" />
-                          <span>{t}</span>
-                        </span>
-                      ))
-                    ) : (
-                      // Default fake tags if none
-                      <>
-                        <span className="flex items-center space-x-1.5 border border-slate-200 text-slate-600 bg-white px-2 py-1 rounded text-[10px] font-semibold uppercase ">
-                          <Tag className="w-3 h-3 text-slate-400" />
-                          <span>Pajak</span>
-                        </span>
-                        <span className="flex items-center space-x-1.5 border border-slate-200 text-slate-600 bg-white px-2 py-1 rounded text-[10px] font-semibold uppercase ">
-                          <Tag className="w-3 h-3 text-slate-400" />
-                          <span>Surat Keputusan</span>
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Gemini Insights Box */}
-                  <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-5 space-y-4">
-                    <div className="flex items-center space-x-2 text-indigo-600 font-bold text-[11px] uppercase tracking-widest">
-                      <Sparkles className="w-4 h-4" />
-                      <span>Gemini Discovery Insights</span>
-                    </div>
-
-                    <div className="bg-white border border-slate-100 p-4 rounded-xl text-[13px] text-slate-600 leading-relaxed">
-                      {aiSummary}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 bg-slate-100/50 p-4 rounded-xl border border-slate-100/50">
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                          Pihak Terlibat
-                        </p>
-                        <p className="text-xs font-semibold text-slate-700 flex items-center space-x-1.5">
-                          <Users className="w-3 h-3 text-indigo-400" />{" "}
-                          <span>{mockupPihak}</span>
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                          Value Transaksi
-                        </p>
-                        <p className="text-xs font-semibold text-slate-700 flex items-center space-x-1.5">
-                          <DollarSign className="w-3 h-3 text-emerald-500" />{" "}
-                          <span>{mockupValue}</span>
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                          Masa Berlaku / Tenggat
-                        </p>
-                        <p className="text-xs font-semibold text-slate-700 flex items-center space-x-1.5">
-                          <Calendar className="w-3 h-3 text-amber-500" />{" "}
-                          <span>{dateStr}</span>
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                          Tingkat Risiko
-                        </p>
-                        <span
-                          className={`font-bold px-2 py-0.5 rounded text-[9px] flex items-center w-fit space-x-1.5 ${isRisikoTinggi ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"}`}
-                        >
-                          <ShieldCheck className="w-3 h-3" />
-                          <span>{mockupRisiko}</span>
-                        </span>
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
 
-                    <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">
-                        Saran Tag Baru (Klik untuk pasang):
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {saranTags.map((st) => (
+                    {/* Title */}
+                    <h3 className="text-xl font-extrabold text-slate-800 leading-tight mb-4">
+                      {docJenisNaskah}
+                    </h3>
+
+                    {/* Meta Info Box */}
+                    <div className={`bg-slate-50/70 border border-slate-100 rounded-xl p-4 grid gap-4 mb-4 ${layoutMode === "grid" ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3"}`}>
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                          Prihal
+                        </p>
+                        <p className="text-sm font-semibold text-slate-700 break-words">
+                          {docPrihal}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                          Jenis Naskah
+                        </p>
+                        <p className="text-sm font-semibold text-slate-700 flex items-center space-x-2">
+                          <Inbox className="w-4 h-4 text-blue-500" />
+                          <span>{docJenisNaskah}</span>
+                        </p>
+                      </div>
+                      <div className={layoutMode === "grid" ? "col-span-2" : ""}>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                          Deskripsi Ringkas
+                        </p>
+                        <p className="text-xs font-medium text-slate-600 leading-relaxed">
+                          {docDescription}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tags */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {doc.tags && doc.tags.length > 0 ? (
+                        doc.tags.map((t) => (
                           <span
-                            key={st}
-                            className="bg-emerald-50 text-emerald-600 font-medium px-2 py-1 rounded text-[10px] border border-emerald-100 flex items-center space-x-1 cursor-pointer hover:bg-emerald-100 transition-colors"
+                            key={t}
+                            className="flex items-center space-x-1.5 border border-slate-200 text-slate-600 bg-white px-2 py-1 rounded text-[10px] font-semibold uppercase"
                           >
-                            <Check className="w-3 h-3" />
-                            <span>{st}</span>
+                            <Tag className="w-3 h-3 text-slate-400" />
+                            <span>{t}</span>
                           </span>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <>
+                          <span className="flex items-center space-x-1.5 border border-slate-200 text-slate-600 bg-white px-2 py-1 rounded text-[10px] font-semibold uppercase ">
+                            <Tag className="w-3 h-3 text-slate-400" />
+                            <span>Umum</span>
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Spacer to push footer to bottom */}
-                  <div className="flex-1"></div>
+                  <div className={layoutMode === "grid" ? "mt-auto" : "w-full sm:w-64 shrink-0 flex flex-col justify-between"}>
+                    <div className="mb-4">
+                      {/* Berkas Naskah Text */}
+                      <h4 className="text-[13px] font-medium text-slate-500 mb-2">
+                        Berkas Naskah
+                      </h4>
 
-                  {/* Footer */}
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <button className="flex items-center space-x-2 text-slate-600 hover:text-indigo-600 font-bold text-xs transition-colors">
-                      <Eye className="w-4 h-4" />
-                      <span>Intip Naskah Asli</span>
-                    </button>
-                    <span className="border border-emerald-200 text-emerald-600 bg-emerald-50 font-bold px-3 py-1 rounded-full text-xs">
-                      Aktif
-                    </span>
+                      {/* File Info Card */}
+                      <div className="border border-dashed border-slate-300 bg-slate-50/30 rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center space-x-3 overflow-hidden pr-3">
+                          <div className="bg-blue-50 text-blue-600 font-extrabold text-[10px] px-2.5 py-1.5 rounded-lg shrink-0">
+                            {doc.fileType.toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-700 truncate">
+                              {doc.name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              {doc.fileSize}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            triggerSimulatedDownload(doc.name);
+                          }}
+                          className="shrink-0 p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <button className="flex items-center space-x-2 text-slate-600 hover:text-indigo-600 font-bold text-xs transition-colors">
+                        <Eye className="w-4 h-4" />
+                        <span>Intip Naskah Asli</span>
+                      </button>
+                      <span className="border border-emerald-200 text-emerald-600 bg-emerald-50 font-bold px-3 py-1 rounded-full text-xs">
+                        Aktif
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -901,6 +857,17 @@ export default function DocumentArchiveView({
                 </label>
                 <input
                   type="file"
+                  onChange={(e) => {
+                     const file = e.target.files?.[0];
+                     if (file) {
+                        const ext = file.name.split('.').pop() || 'pdf';
+                        setManualForm({
+                           ...manualForm,
+                           fileSize: formatBytes(file.size),
+                           fileType: ext
+                        });
+                     }
+                  }}
                   className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all font-sans file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                 />
               </div>
@@ -910,19 +877,6 @@ export default function DocumentArchiveView({
                   <label className="text-xs font-bold text-slate-700">
                     Deskripsi Ringkas Dokumen
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => handleAiSuggest("summarize")}
-                    disabled={isGeneratingAi}
-                    className="text-[10px] flex items-center space-x-1 font-bold text-indigo-600 hover:text-indigo-800 transition-colors disabled:opacity-50"
-                  >
-                    {isGeneratingAi ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-3 h-3" />
-                    )}
-                    <span>AI Rewrite</span>
-                  </button>
                 </div>
                 <textarea
                   required={manualForm.arsipType === "Arsip Umum"}
@@ -944,19 +898,6 @@ export default function DocumentArchiveView({
                   <label className="text-xs font-bold text-slate-700">
                     Tag / Label (Pisahkan dengan koma)
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => handleAiSuggest("tags")}
-                    disabled={isGeneratingAi}
-                    className="text-[10px] flex items-center space-x-1 font-bold text-indigo-600 hover:text-indigo-800 transition-colors disabled:opacity-50"
-                  >
-                    {isGeneratingAi ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-3 h-3" />
-                    )}
-                    <span>AI Generate Tags</span>
-                  </button>
                 </div>
                 <input
                   type="text"

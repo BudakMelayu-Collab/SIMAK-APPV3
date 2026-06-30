@@ -14,6 +14,8 @@ import Leave from "./components/Leave";
 import DocumentArchiveView from "./components/Archive";
 import AiAssistant from "./components/AiAssistant";
 import Login from "./components/Login";
+import Settings from "./components/Settings";
+import EditProfileModal from "./components/EditProfileModal";
 
 // Importing Icons
 import {
@@ -35,6 +37,7 @@ import {
   ShieldCheck,
   Crown,
   Bot,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -48,6 +51,7 @@ const navigationItems = [
   { id: "leave", label: "Kontrol Cuti", icon: CalendarDays },
   { id: "archive", label: "Arsip Dokumen", icon: FileBox },
   { id: "ai-assistant", label: "Asisten AI", icon: Bot },
+  { id: "settings", label: "Pengaturan", icon: SettingsIcon },
 ];
 
 export default function App() {
@@ -81,6 +85,7 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] =
     useState<boolean>(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
 
   // Core States
   const [staff, setStaff] = useState<StaffProfile[]>([]);
@@ -92,6 +97,62 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    const parseStaff = (rows: any[]) => rows.map(row => {
+      let extra: any = {};
+      if (row.notes) {
+        try { extra = JSON.parse(row.notes); } catch(e) {}
+      }
+      return {
+        ...row,
+        ...extra,
+        role: row.position,
+        joinDate: row.startdate,
+        leaveBalance: Number(row.leavebalance || extra.leaveBalance) || 0,
+      };
+    });
+
+    const parseInventory = (rows: any[]) => rows.map(row => {
+      let extra: any = {};
+      if (row.notes) {
+        try { extra = JSON.parse(row.notes); } catch(e) {}
+      }
+      return { 
+        ...row, 
+        ...extra,
+        assignedToId: row.assignedtoid,
+        assignedToName: row.assignedtoname,
+        purchaseDate: row.purchasedate,
+        code: row.serialnumber || extra.code || '',
+        quantity: Number(extra.quantity || row.quantity) || 1,
+        unitPrice: Number(extra.unitPrice || row.unitprice) || 0,
+      };
+    });
+
+    const parseLeaves = (rows: any[]) => rows.map(row => ({
+      ...row,
+      staffId: row.staffid,
+      staffName: row.staffname,
+      leaveType: row.type,
+      startDate: row.startdate,
+      endDate: row.enddate,
+      durationDays: Number(row.durationdays) || 1,
+      requestDate: row.requestdate
+    }));
+
+    const parseDocuments = (rows: any[]) => rows.map(row => {
+      let tags = [];
+      try {
+        tags = row.tags ? JSON.parse(row.tags) : [];
+      } catch(e) {}
+      return {
+        ...row,
+        uploadDate: row.uploaddate,
+        fileSize: row.filesize || "Unknown",
+        fileType: row.filetype,
+        tags
+      };
+    });
+
     const fetchData = async () => {
       const [{ data: staffData }, { data: invData }, { data: leaveData }, { data: docData }] = await Promise.all([
         supabase.from("staff").select("*"),
@@ -99,26 +160,26 @@ export default function App() {
         supabase.from("leaves").select("*"),
         supabase.from("documents").select("*")
       ]);
-      if (staffData) setStaff(staffData);
-      if (invData) setInventory(invData);
-      if (leaveData) setLeaves(leaveData);
-      if (docData) setDocuments(docData);
+      if (staffData) setStaff(parseStaff(staffData));
+      if (invData) setInventory(parseInventory(invData));
+      if (leaveData) setLeaves(parseLeaves(leaveData));
+      if (docData) setDocuments(parseDocuments(docData));
     };
 
     fetchData();
 
     const channel = supabase.channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, () => {
-        supabase.from("staff").select("*").then(({ data }) => { if(data) setStaff(data) });
+        supabase.from("staff").select("*").then(({ data }) => { if(data) setStaff(parseStaff(data)) });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        supabase.from("inventory").select("*").then(({ data }) => { if(data) setInventory(data) });
+        supabase.from("inventory").select("*").then(({ data }) => { if(data) setInventory(parseInventory(data)) });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leaves' }, () => {
-        supabase.from("leaves").select("*").then(({ data }) => { if(data) setLeaves(data) });
+        supabase.from("leaves").select("*").then(({ data }) => { if(data) setLeaves(parseLeaves(data)) });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
-        supabase.from("documents").select("*").then(({ data }) => { if(data) setDocuments(data) });
+        supabase.from("documents").select("*").then(({ data }) => { if(data) setDocuments(parseDocuments(data)) });
       })
       .subscribe();
 
@@ -135,19 +196,44 @@ export default function App() {
   }, [activeTab]);
 
   // --- Handlers for Inventory ---
+  const serializeInventory = (id: string, item: any) => {
+    const { name, category, status, assignedToId, assignedToName, purchaseDate, location, code, ...extra } = item;
+    return {
+      id,
+      name: name || 'Tanpa Nama',
+      category: category || 'Lainnya',
+      status: status || 'Tersedia',
+      assignedtoid: assignedToId || null,
+      assignedtoname: assignedToName || null,
+      purchasedate: purchaseDate || new Date().toISOString(),
+      location: location || 'Gudang',
+      serialnumber: code || '',
+      condition: 'Baik',
+      notes: JSON.stringify({ ...extra, code: code || '' })
+    };
+  };
+
   const handleAddInventory = async (item: Omit<InventoryItem, "id">) => {
     try {
-      const newId = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
-      await supabase.from("inventory").insert({ id: newId, ...item });
-    } catch (e) {
+      const newId = `INV-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const payload = serializeInventory(newId, item);
+      const { error } = await supabase.from("inventory").insert(payload);
+      if (error) {
+        console.error("Supabase insert error:", error);
+        throw error;
+      }
+    } catch (e: any) {
       console.error(e);
+      throw e;
     }
   };
 
   const handleUpdateInventory = async (updatedItem: InventoryItem) => {
     try {
       const { id, ...data } = updatedItem;
-      await supabase.from("inventory").update(data).eq("id", id);
+      const payload = serializeInventory(id, data);
+      const { id: _removedId, ...updatePayload } = payload;
+      await supabase.from("inventory").update(updatePayload).eq("id", id);
     } catch (e) {
       console.error(e);
     }
@@ -155,6 +241,7 @@ export default function App() {
 
   const handleDeleteInventory = async (id: string) => {
     try {
+      setInventory(prev => prev.filter(i => i.id !== id));
       await supabase.from("inventory").delete().eq("id", id);
     } catch (e) {
       console.error(e);
@@ -162,10 +249,26 @@ export default function App() {
   };
 
   // --- Handlers for Staff ---
+  const serializeStaff = (id: string, profile: any) => {
+    const { name, role, department, status, email, phone, joinDate, leaveBalance, ...extra } = profile;
+    return {
+      id,
+      name: name || 'Tanpa Nama',
+      position: role || 'Staf',
+      department: department || 'Umum',
+      status: status || 'Aktif',
+      contact: email || phone || '-',
+      startdate: joinDate || new Date().toISOString().split('T')[0],
+      leavebalance: leaveBalance || 0,
+      notes: JSON.stringify({ ...extra, email, phone })
+    };
+  };
+
   const handleAddStaff = async (profile: Omit<StaffProfile, "id">) => {
     try {
-      const newId = `STF-0${staff.length + 1}`;
-      await supabase.from("staff").insert({ id: newId, ...profile });
+      const newId = `STF-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const payload = serializeStaff(newId, profile);
+      await supabase.from("staff").insert(payload);
     } catch (e) {
       console.error(e);
     }
@@ -174,12 +277,14 @@ export default function App() {
   const handleUpdateStaff = async (updatedProfile: StaffProfile) => {
     try {
       const { id, ...data } = updatedProfile;
-      await supabase.from("staff").update(data).eq("id", id);
+      const payload = serializeStaff(id, data);
+      const { id: _removedId, ...updatePayload } = payload;
+      await supabase.from("staff").update(updatePayload).eq("id", id);
       
       const relatedInv = inventory.filter(item => item.assignedToId === id);
       if (relatedInv.length > 0) {
         await Promise.all(relatedInv.map(item => 
-          supabase.from("inventory").update({ assignedToName: updatedProfile.name }).eq("id", item.id)
+          supabase.from("inventory").update({ assignedtoname: updatedProfile.name }).eq("id", item.id)
         ));
       }
     } catch (e) {
@@ -189,12 +294,13 @@ export default function App() {
 
   const handleDeleteStaff = async (id: string) => {
     try {
+      setStaff(prev => prev.filter(s => s.id !== id));
       await supabase.from("staff").delete().eq("id", id);
 
       const relatedInv = inventory.filter(item => item.assignedToId === id);
       if (relatedInv.length > 0) {
         await Promise.all(relatedInv.map(item => 
-          supabase.from("inventory").update({ assignedToId: null, assignedToName: null, status: "Tersedia" }).eq("id", item.id)
+          supabase.from("inventory").update({ assignedtoid: null, assignedtoname: null, status: "Tersedia" }).eq("id", item.id)
         ));
       }
 
@@ -210,13 +316,27 @@ export default function App() {
   };
 
   // --- Handlers for Leaves ---
+  const serializeLeave = (id: string, req: Omit<LeaveRequest, "id" | "requestDate">, requestDate: string) => ({
+    id,
+    staffid: req.staffId,
+    staffname: req.staffName,
+    type: req.leaveType,
+    startdate: req.startDate,
+    enddate: req.endDate,
+    durationdays: req.durationDays,
+    reason: req.reason,
+    status: req.status,
+    requestdate: requestDate
+  });
+
   const handleAddLeaveRequest = async (
     req: Omit<LeaveRequest, "id" | "requestDate">,
   ) => {
     try {
-      const newId = `LV-${Math.floor(100 + Math.random() * 900)}`;
+      const newId = `LV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const requestDate = new Date().toISOString().split("T")[0];
-      await supabase.from("leaves").insert({ id: newId, ...req, requestDate });
+      const payload = serializeLeave(newId, req, requestDate);
+      await supabase.from("leaves").insert(payload);
     } catch (e) {
       console.error(e);
     }
@@ -233,7 +353,7 @@ export default function App() {
       if (member) {
         const newBalance = Math.max(0, member.leaveBalance - req.durationDays);
         await supabase.from("staff").update({
-          leaveBalance: newBalance,
+          leavebalance: newBalance,
           status: "Cuti",
         }).eq("id", member.id);
       }
@@ -241,7 +361,7 @@ export default function App() {
       const relatedInv = inventory.filter(item => item.assignedToId === req.staffId);
       if (relatedInv.length > 0) {
         await Promise.all(relatedInv.map(item => 
-          supabase.from("inventory").update({ assignedToName: `${req.staffName} (Sedang Cuti)` }).eq("id", item.id)
+          supabase.from("inventory").update({ assignedtoname: `${req.staffName} (Sedang Cuti)` }).eq("id", item.id)
         ));
       }
     } catch (e) {
@@ -258,13 +378,25 @@ export default function App() {
   };
 
   // --- Handlers for Documents ---
+  const serializeDocument = (id: string, doc: Omit<DocumentArchive, "id" | "uploadDate">, uploadDate: string) => ({
+    id,
+    name: doc.name,
+    category: doc.category,
+    uploaddate: uploadDate,
+    filesize: doc.fileSize,
+    filetype: doc.fileType,
+    description: doc.description || null,
+    tags: doc.tags ? JSON.stringify(doc.tags) : null
+  });
+
   const handleAddDocument = async (
     docReq: Omit<DocumentArchive, "id" | "uploadDate">,
   ) => {
     try {
-      const newId = `DOC-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newId = `DOC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
       const uploadDate = new Date().toISOString().split("T")[0];
-      await supabase.from("documents").insert({ id: newId, ...docReq, uploadDate });
+      const payload = serializeDocument(newId, docReq, uploadDate);
+      await supabase.from("documents").insert(payload);
     } catch (e) {
       console.error(e);
     }
@@ -272,6 +404,7 @@ export default function App() {
 
   const handleDeleteDocument = async (id: string) => {
     try {
+      setDocuments(prev => prev.filter(d => d.id !== id));
       await supabase.from("documents").delete().eq("id", id);
     } catch (e) {
       console.error(e);
@@ -331,11 +464,6 @@ export default function App() {
 
         {/* Navigation list */}
         <nav className="flex-1 p-5 space-y-2 overflow-y-auto">
-          {!isSidebarCollapsed && (
-            <div className="text-[10px] font-bold text-slate-400/80 uppercase px-3 py-2 tracking-widest mb-1">
-              Applications
-            </div>
-          )}
           {navigationItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -365,16 +493,6 @@ export default function App() {
         </nav>
 
         {/* Sidebar Footer Details */}
-        {!isSidebarCollapsed && (
-          <div className="p-5 border-t border-slate-100/50 text-[11px] text-slate-400 space-y-1.5 bg-slate-50/30">
-            <span className="font-mono font-medium block truncate">
-              User: {currentUser?.email || "Unknown"}
-            </span>
-            <span className="block font-mono font-medium">
-              Domain: admin.simak.baznas.go.id
-            </span>
-          </div>
-        )}
       </aside>
 
       {/* Side drawer for Mobile screens */}
@@ -430,9 +548,6 @@ export default function App() {
 
               {/* Navigation list */}
               <nav className="flex-1 mt-4 space-y-2 overflow-y-auto">
-                <div className="text-[10px] font-bold text-slate-400 uppercase px-3 py-2 tracking-widest">
-                  Applications
-                </div>
                 {navigationItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
@@ -475,10 +590,6 @@ export default function App() {
 
             {/* Current Active view context */}
             <div className="flex items-center space-x-3 text-[15px] font-semibold text-slate-800 tracking-tight">
-              <span className="hidden sm:inline text-slate-400">
-                Applications
-              </span>
-              <span className="hidden sm:inline text-slate-300">/</span>
               <span className="bg-white/80 backdrop-blur-md shadow-sm ring-1 ring-slate-900/5 text-slate-900 px-4 py-1.5 rounded-full">
                 {navigationItems.find((i) => i.id === activeTab)?.label}
               </span>
@@ -486,14 +597,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center space-x-6">
-            {/* Real-time indicator widget */}
-            <div className="hidden md:flex items-center space-x-2 text-xs text-slate-500 bg-white/60 backdrop-blur-md shadow-sm ring-1 ring-slate-900/5 px-4 py-2 rounded-full">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse border border-white"></span>
-              <span className="font-semibold tracking-wide">Connected</span>
-              <span className="text-slate-300">|</span>
-              <span className="font-mono font-medium">UTC 18:15</span>
-            </div>
-
             {/* Profile badge wrapper with Dropdown */}
             <div className="relative">
               <div
@@ -507,7 +610,7 @@ export default function App() {
                   <div className="flex items-center justify-end space-x-1 mt-1 text-amber-500">
                     <ShieldCheck className="w-3 h-3" />
                     <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500">
-                      Administrator
+                      {currentUser?.user_metadata?.role || "Administrator"}
                     </span>
                   </div>
                 </div>
@@ -515,7 +618,7 @@ export default function App() {
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden shadow-lg shadow-blue-500/10 ring-2 ring-white group-hover:ring-blue-500/30 transition-all bg-gradient-to-br from-blue-50 to-indigo-50">
                     <img
                       src={currentUser?.user_metadata?.avatar_url || "https://i.pravatar.cc/150"}
-                      alt="Admin Profile"
+                      alt="User Profile"
                       className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-500"
                     />
                   </div>
@@ -553,7 +656,7 @@ export default function App() {
                                 currentUser?.user_metadata?.avatar_url ||
                                 "https://i.pravatar.cc/150"
                               }
-                              alt="Admin Profile"
+                              alt="User Profile"
                               className="w-full h-full object-cover"
                             />
                           </div>
@@ -562,13 +665,25 @@ export default function App() {
                               {currentUser?.user_metadata?.full_name || "Admin"}
                             </span>
                             <span className="text-[10px] text-blue-300 font-mono tracking-widest uppercase">
-                              Pusat Otoritas
+                              {currentUser?.user_metadata?.role || "Administrator"}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="p-2">
+                      <div className="p-2 space-y-1">
+                        <button
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            setIsEditProfileModalOpen(true);
+                          }}
+                          className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 hover:text-blue-600 text-sm font-semibold transition-colors group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
+                            <UserIcon className="w-4 h-4" />
+                          </div>
+                          <span>Edit Profil</span>
+                        </button>
                         <button
                           onClick={async () => {
                             setIsProfileDropdownOpen(false);
@@ -656,6 +771,8 @@ export default function App() {
               )}
 
               {activeTab === "ai-assistant" && <AiAssistant />}
+
+              {activeTab === "settings" && <Settings />}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -666,6 +783,23 @@ export default function App() {
           Terjaga.
         </footer>
       </div>
+
+      <EditProfileModal
+        isOpen={isEditProfileModalOpen}
+        onClose={() => setIsEditProfileModalOpen(false)}
+        currentUser={currentUser}
+        onProfileUpdated={(user) => {
+          if (user) {
+            setCurrentUser(user);
+          } else {
+            supabase.auth.getUser().then(({ data: { user } }) => {
+              if (user) {
+                setCurrentUser(user);
+              }
+            });
+          }
+        }}
+      />
     </div>
   );
 }

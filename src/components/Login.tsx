@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Loader2, ArrowRight } from "lucide-react";
 import { supabase } from "../supabase";
@@ -9,6 +9,22 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState("Staf Pendistribusian");
+  const [takenAdminRoles, setTakenAdminRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      const { data } = await supabase
+        .from("staff")
+        .select("position")
+        .ilike("position", "%Admin SDM dan Umum%");
+      if (data) {
+        setTakenAdminRoles(data.map(d => d.position));
+      }
+    };
+    fetchAdmins();
+  }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,11 +32,33 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     setErrorInfo(null);
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              full_name: fullName,
+              role: role,
+            },
+          },
         });
         if (error) throw error;
+        
+        if (signUpData?.user) {
+          const { error: insertError } = await supabase.from("staff").insert({
+            id: `STF-${Date.now()}`,
+            name: fullName,
+            position: role,
+            department: role.includes("Admin") ? "SDM dan Umum" : role.replace("Staf ", ""),
+            contact: email,
+            status: "Aktif",
+            startdate: new Date().toISOString().split("T")[0],
+            leavebalance: 12,
+            notes: JSON.stringify({ email: email })
+          });
+          if (insertError) console.error("Insert error:", insertError);
+        }
+        
         setErrorInfo("Pendaftaran berhasil. Silakan masuk atau periksa email Anda.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -42,7 +80,6 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       {/* Background Ornaments (Grand/Megah feel) */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-900/20 blur-[120px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-900/20 blur-[120px] rounded-full pointer-events-none"></div>
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 pointer-events-none"></div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -50,19 +87,33 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="w-full max-w-md p-8 relative z-10"
       >
-        <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/10 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-          {/* Inner Light glow */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50"></div>
+        <div className="relative rounded-3xl shadow-2xl overflow-hidden p-[1px]">
+          {/* Animated Glow Border */}
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 5, ease: "linear" }}
+            className="absolute top-1/2 left-1/2 w-[250%] h-[250%] -translate-x-1/2 -translate-y-1/2"
+            style={{
+              background: "conic-gradient(from 0deg, transparent 75%, rgba(59, 130, 246, 0.8) 100%)",
+            }}
+          />
+          <div className="relative z-10 h-full w-full backdrop-blur-3xl bg-[#020817]/90 rounded-[calc(1.5rem-1px)] p-8">
+            {/* Inner Light glow */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-[1px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
 
-          <div className="text-center mb-10">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg shadow-blue-500/10 overflow-hidden relative group">
-              <div className="absolute inset-0 bg-blue-500/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-in-out"></div>
+            <div className="text-center mb-10">
+            <motion.div
+              animate={{ y: [0, -10, 0] }}
+              transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+              className="w-24 h-24 mx-auto mb-6 flex items-center justify-center relative"
+            >
+              <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full"></div>
               <img
                 src="https://i.ibb.co.com/FbHbkzXX/SIMAK-V3.png"
                 alt="SIMAK Logo"
-                className="w-16 h-16 object-contain relative z-10"
+                className="w-20 h-20 object-contain relative z-10 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]"
               />
-            </div>
+            </motion.div>
             <h1 className="text-3xl font-bold text-white tracking-tight mb-2">
               SIMAK
             </h1>
@@ -77,6 +128,41 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
 
           <form onSubmit={handleAuth} className="space-y-6">
             <div className="space-y-4">
+              {isSignUp && (
+                <>
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1.5">Nama Lengkap</label>
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      placeholder="Nama Lengkap Anda"
+                      required={isSignUp}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-300 block mb-1.5">Peran (Role)</label>
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none"
+                      required={isSignUp}
+                    >
+                      {!takenAdminRoles.includes("Admin SDM dan Umum 1") && (
+                        <option value="Admin SDM dan Umum 1" className="bg-[#020817]">Admin SDM dan Umum 1</option>
+                      )}
+                      {!takenAdminRoles.includes("Admin SDM dan Umum 2") && (
+                        <option value="Admin SDM dan Umum 2" className="bg-[#020817]">Admin SDM dan Umum 2</option>
+                      )}
+                      <option value="Staf Pendistribusian" className="bg-[#020817]">Staf Pendistribusian</option>
+                      <option value="Staf Pengumpulan" className="bg-[#020817]">Staf Pengumpulan</option>
+                      <option value="Staf Keuangan" className="bg-[#020817]">Staf Keuangan</option>
+                      <option value="Staf SDM dan Umum" className="bg-[#020817]">Staf SDM dan Umum</option>
+                    </select>
+                  </div>
+                </>
+              )}
               <div>
                 <label className="text-xs font-bold text-slate-300 block mb-1.5">Email</label>
                 <input
@@ -98,6 +184,18 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
                   placeholder="••••••••"
                   required
                 />
+                
+                {!isSignUp && (
+                  <div className="flex items-center justify-between mt-3">
+                    <label className="flex items-center space-x-2 text-xs text-slate-400 cursor-pointer group">
+                      <input type="checkbox" className="rounded border-white/10 bg-white/5 text-blue-500 focus:ring-blue-500/50 cursor-pointer" />
+                      <span className="group-hover:text-slate-300 transition-colors">Ingat Saya</span>
+                    </label>
+                    <button type="button" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                      Lupa Password?
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -140,11 +238,8 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
               </button>
             </div>
           </form>
+          </div>
         </div>
-
-        <p className="max-w-xs mx-auto text-center mt-8 text-[10px] text-slate-500 font-mono">
-          Akses terbatas hanya untuk personel otorisasi Baznas.
-        </p>
       </motion.div>
     </div>
   );

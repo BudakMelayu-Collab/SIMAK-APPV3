@@ -29,7 +29,7 @@ export interface InventoryItem {
   unitPrice?: number;
   assignedToId?: string; // Reference to StaffProfile.id
   assignedToName?: string;
-  status: 'Tersedia' | 'Digunakan' | 'Rusak' | 'Dalam Perbaikan';
+  status: string; // Changed to allow any string
   location: string;
   purchaseDate: string;
 }
