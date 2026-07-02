@@ -38,10 +38,27 @@ export default function Dashboard({
   onApproveLeave,
   onRejectLeave,
 }: DashboardProps) {
+  // Filter out Super Admin from Dashboard calculations and display
+  const dashboardStaff = staff.filter(s => s.role !== "Super Admin");
+
   // Calculations
-  const totalStaff = staff.length;
-  const staffOnLeave = staff.filter((s) => s.status === "Cuti").length;
-  const activeStaff = staff.filter((s) => s.status === "Aktif").length;
+  const totalStaff = dashboardStaff.length;
+  const today = new Date().toISOString().split("T")[0];
+  const staffOnLeave = Array.from(
+    new Set(
+      leaves
+        .filter(
+          (l) =>
+            l.status === "Disetujui" &&
+            l.startDate <= today &&
+            l.endDate >= today &&
+            dashboardStaff.some((s) => s.id === l.staffId)
+        )
+        .map((l) => l.staffId)
+    )
+  ).length;
+  const inactiveStaff = dashboardStaff.filter((s) => s.status === "Nonaktif").length;
+  const activeStaff = totalStaff - staffOnLeave - inactiveStaff;
 
   const totalInventory = inventory.length;
   const layakPakai = inventory.filter(
@@ -100,7 +117,7 @@ export default function Dashboard({
     });
   });
 
-  staff.forEach((s) => {
+  dashboardStaff.forEach((s) => {
     dynamicActivities.push({
       id: `staff-${s.id}`,
       type: "staff",
@@ -183,7 +200,7 @@ export default function Dashboard({
 
           {/* Overlapping Staff Avatars */}
           <div className="flex -space-x-2 overflow-hidden">
-            {staff.slice(0, 3).map((member, i) =>
+            {dashboardStaff.slice(0, 3).map((member, i) =>
               member.avatarUrl ? (
                 <img
                   key={member.id}
@@ -204,9 +221,9 @@ export default function Dashboard({
                 </div>
               ),
             )}
-            {staff.length > 3 && (
+            {dashboardStaff.length > 3 && (
               <div className="inline-block h-8 w-8 rounded-full ring-2 ring-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm">
-                +{staff.length - 3}
+                +{dashboardStaff.length - 3}
               </div>
             )}
           </div>

@@ -7,6 +7,7 @@ export interface StaffProfile {
   education?: string;
   trainingHistory?: string;
   role: string;
+  jabatan?: string;
   department: string;
   email: string;
   phone: string;
@@ -16,6 +17,14 @@ export interface StaffProfile {
   allocationsCount?: number;
   leaveBalance: number;
   specialLeaveBalance?: number;
+  permissions?: string[];
+  lastLogin?: string;
+  activityLog?: Array<{
+    id: string;
+    action: string;
+    date: string;
+    details?: string;
+  }>;
 }
 
 export interface InventoryItem {
@@ -47,6 +56,13 @@ export interface LeaveRequest {
   requestDate: string;
 }
 
+export interface DocumentFile {
+  name: string;
+  size: string;
+  type: string;
+  url: string;
+}
+
 export interface DocumentArchive {
   id: string;
   name: string;
@@ -56,6 +72,8 @@ export interface DocumentArchive {
   description: string;
   fileType: string;
   tags?: string[];
+  fileUrl?: string;
+  files?: DocumentFile[];
 }
 
 // Initial Mock Data

@@ -48,6 +48,7 @@ export default function Inventory({
 
   // Form States
   const [currentItem, setCurrentItem] = useState<InventoryItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
   const [formData, setFormData] = useState({
     assetType: "",
     name: "",
@@ -528,7 +529,7 @@ export default function Inventory({
                         </button>
                         <button
                           onClick={() => {
-                            if (confirm("Hapus?")) onDeleteInventory(item.id);
+                            setItemToDelete(item);
                           }}
                           className="p-1 text-slate-400 hover:text-red-600"
                         >
@@ -1030,6 +1031,34 @@ export default function Inventory({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {itemToDelete && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150 p-6 flex flex-col space-y-4">
+            <h3 className="font-bold text-slate-800 text-lg">Konfirmasi Hapus</h3>
+            <p className="text-sm text-slate-600">
+              Apakah Anda yakin ingin menghapus inventaris {itemToDelete.name}? Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div className="flex items-center justify-end space-x-3 pt-4">
+              <button
+                onClick={() => setItemToDelete(null)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg text-sm hover:bg-slate-200 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteInventory(itemToDelete.id);
+                  setItemToDelete(null);
+                }}
+                className="px-4 py-2 bg-rose-600 text-white font-semibold rounded-lg text-sm hover:bg-rose-700 transition-colors"
+              >
+                Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}

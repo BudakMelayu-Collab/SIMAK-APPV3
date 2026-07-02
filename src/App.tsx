@@ -16,6 +16,7 @@ import AiAssistant from "./components/AiAssistant";
 import Login from "./components/Login";
 import Settings from "./components/Settings";
 import EditProfileModal from "./components/EditProfileModal";
+import UserManagement from "./components/UserManagement";
 
 // Importing Icons
 import {
@@ -38,6 +39,7 @@ import {
   Crown,
   Bot,
   Settings as SettingsIcon,
+  UserCog,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -51,8 +53,11 @@ const navigationItems = [
   { id: "leave", label: "Kontrol Cuti", icon: CalendarDays },
   { id: "archive", label: "Arsip Dokumen", icon: FileBox },
   { id: "ai-assistant", label: "Asisten AI", icon: Bot },
+  { id: "user-management", label: "Manajemen Akses", icon: UserCog },
   { id: "settings", label: "Pengaturan", icon: SettingsIcon },
 ];
+
+const EPHEMERAL_FILE_URLS: Record<string, string> = {};
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -66,7 +71,9 @@ export default function App() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setIsAuthenticated(true);
         setCurrentUser(session.user);
@@ -97,68 +104,122 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const parseStaff = (rows: any[]) => rows.map(row => {
-      let extra: any = {};
-      if (row.notes) {
-        try { extra = JSON.parse(row.notes); } catch(e) {}
-      }
-      return {
+    const parseStaff = (rows: any[]) =>
+      rows.map((row) => {
+        let extra: any = {};
+        if (row.notes) {
+          try {
+            extra = JSON.parse(row.notes);
+          } catch (e) {}
+        }
+        let rawRole = extra.role || row.position || "Staf SDM dan Umum";
+        let rawJabatan = extra.jabatan || "Staf";
+
+        const emailLower = (row.contact || "").toLowerCase();
+        if (emailLower.includes("alan.kurniawan4495@gmail.com")) {
+          rawRole = "Admin SDM dan Umum 1";
+          rawJabatan = "Kepala Bagian";
+        } else if (emailLower.includes("muhammad.nawa@gmail.com")) {
+          rawRole = "Super Admin";
+          rawJabatan = "Staf";
+        } else {
+          if (!extra.jabatan) {
+            const pos = row.position || "";
+            if (pos === "Kepala Pelaksana") {
+              rawJabatan = "Kepala Pelaksana";
+            } else if (pos.startsWith("Kepala Bidang")) {
+              rawJabatan = "Kepala Bidang";
+            } else if (pos.startsWith("Kepala Bagian")) {
+              rawJabatan = "Kepala Bagian";
+            } else if (pos.startsWith("Kepala Sub Bidang")) {
+              rawJabatan = "Kepala Sub Bidang";
+            } else {
+              rawJabatan = "Staf";
+            }
+          }
+        }
+        return {
+          ...row,
+          ...extra,
+          role: rawRole,
+          jabatan: rawJabatan,
+          joinDate: row.startdate,
+          leaveBalance: Number(row.leavebalance || extra.leaveBalance) || 0,
+        };
+      });
+
+    const parseInventory = (rows: any[]) =>
+      rows.map((row) => {
+        let extra: any = {};
+        if (row.notes) {
+          try {
+            extra = JSON.parse(row.notes);
+          } catch (e) {}
+        }
+        return {
+          ...row,
+          ...extra,
+          assignedToId: row.assignedtoid,
+          assignedToName: row.assignedtoname,
+          purchaseDate: row.purchasedate,
+          code: row.serialnumber || extra.code || "",
+          quantity: Number(extra.quantity || row.quantity) || 1,
+          unitPrice: Number(extra.unitPrice || row.unitprice) || 0,
+        };
+      });
+
+    const parseLeaves = (rows: any[]) =>
+      rows.map((row) => ({
         ...row,
-        ...extra,
-        role: row.position,
-        joinDate: row.startdate,
-        leaveBalance: Number(row.leavebalance || extra.leaveBalance) || 0,
-      };
-    });
+        staffId: row.staffid,
+        staffName: row.staffname,
+        leaveType: row.type,
+        startDate: row.startdate,
+        endDate: row.enddate,
+        durationDays: Number(row.durationdays) || 1,
+        requestDate: row.requestdate,
+      }));
 
-    const parseInventory = (rows: any[]) => rows.map(row => {
-      let extra: any = {};
-      if (row.notes) {
-        try { extra = JSON.parse(row.notes); } catch(e) {}
-      }
-      return { 
-        ...row, 
-        ...extra,
-        assignedToId: row.assignedtoid,
-        assignedToName: row.assignedtoname,
-        purchaseDate: row.purchasedate,
-        code: row.serialnumber || extra.code || '',
-        quantity: Number(extra.quantity || row.quantity) || 1,
-        unitPrice: Number(extra.unitPrice || row.unitprice) || 0,
-      };
-    });
+    const parseDocuments = (rows: any[]) =>
+      rows.map((row) => {
+        let tags = [];
+        try {
+          tags = row.tags ? JSON.parse(row.tags) : [];
+        } catch (e) {}
 
-    const parseLeaves = (rows: any[]) => rows.map(row => ({
-      ...row,
-      staffId: row.staffid,
-      staffName: row.staffname,
-      leaveType: row.type,
-      startDate: row.startdate,
-      endDate: row.enddate,
-      durationDays: Number(row.durationdays) || 1,
-      requestDate: row.requestdate
-    }));
+        let fileUrl = EPHEMERAL_FILE_URLS[row.id] || undefined;
+        let files = undefined;
 
-    const parseDocuments = (rows: any[]) => rows.map(row => {
-      let tags = [];
-      try {
-        tags = row.tags ? JSON.parse(row.tags) : [];
-      } catch(e) {}
-      return {
-        ...row,
-        uploadDate: row.uploaddate,
-        fileSize: row.filesize || "Unknown",
-        fileType: row.filetype,
-        tags
-      };
-    });
+        if (row.description && row.description.startsWith("JSON_META:")) {
+          try {
+            const meta = JSON.parse(row.description.substring(10));
+            if (meta.fileUrl) fileUrl = meta.fileUrl;
+            if (meta.files) files = meta.files;
+          } catch (e) {}
+        }
+
+        return {
+          ...row,
+          uploadDate: row.uploaddate,
+          fileSize: row.filesize || "Unknown",
+          fileType: row.filetype,
+          fileUrl,
+          files,
+          tags,
+        };
+      });
 
     const fetchData = async () => {
-      const [{ data: staffData }, { data: invData }, { data: leaveData }, { data: docData }] = await Promise.all([
+      const [
+        { data: staffData },
+        { data: invData },
+        { data: leaveData },
+        { data: docData },
+      ] = await Promise.all([
         supabase.from("staff").select("*"),
         supabase.from("inventory").select("*"),
         supabase.from("leaves").select("*"),
-        supabase.from("documents").select("*")
+        supabase.from("documents").select("*"),
       ]);
       if (staffData) setStaff(parseStaff(staffData));
       if (invData) setInventory(parseInventory(invData));
@@ -168,19 +229,56 @@ export default function App() {
 
     fetchData();
 
-    const channel = supabase.channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, () => {
-        supabase.from("staff").select("*").then(({ data }) => { if(data) setStaff(parseStaff(data)) });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        supabase.from("inventory").select("*").then(({ data }) => { if(data) setInventory(parseInventory(data)) });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaves' }, () => {
-        supabase.from("leaves").select("*").then(({ data }) => { if(data) setLeaves(parseLeaves(data)) });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
-        supabase.from("documents").select("*").then(({ data }) => { if(data) setDocuments(parseDocuments(data)) });
-      })
+    const channel = supabase
+      .channel("schema-db-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "staff" },
+        () => {
+          supabase
+            .from("staff")
+            .select("*")
+            .then(({ data }) => {
+              if (data) setStaff(parseStaff(data));
+            });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "inventory" },
+        () => {
+          supabase
+            .from("inventory")
+            .select("*")
+            .then(({ data }) => {
+              if (data) setInventory(parseInventory(data));
+            });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "leaves" },
+        () => {
+          supabase
+            .from("leaves")
+            .select("*")
+            .then(({ data }) => {
+              if (data) setLeaves(parseLeaves(data));
+            });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "documents" },
+        () => {
+          supabase
+            .from("documents")
+            .select("*")
+            .then(({ data }) => {
+              if (data) setDocuments(parseDocuments(data));
+            });
+        },
+      )
       .subscribe();
 
     return () => {
@@ -195,21 +293,81 @@ export default function App() {
     }
   }, [activeTab]);
 
+  // Track last login
+  useEffect(() => {
+    if (isAuthenticated && currentUser?.email && staff.length > 0) {
+      const userProfile = staff.find((s) => s.email === currentUser.email);
+      if (userProfile) {
+        const now = new Date();
+        const lastLogin = userProfile.lastLogin
+          ? new Date(userProfile.lastLogin)
+          : null;
+        // Update if no lastLogin or lastLogin was more than 1 hour ago
+        if (!lastLogin || now.getTime() - lastLogin.getTime() > 3600000) {
+          const { id, ...data } = {
+            ...userProfile,
+            lastLogin: now.toISOString(),
+          };
+          const payload = serializeStaff(id, data);
+          const { id: _removedId, ...updatePayload } = payload;
+          supabase.from("staff").update(updatePayload).eq("id", id).then();
+        }
+      }
+    }
+  }, [isAuthenticated, currentUser?.email, staff.length]);
+
+  const logUserActivity = async (action: string, details?: string) => {
+    if (!currentUser?.email) return;
+    const userProfile = staff.find((s) => s.email === currentUser.email);
+    if (!userProfile) return;
+
+    const newLog = {
+      id: `log-${Date.now()}`,
+      action,
+      date: new Date().toISOString(),
+      details,
+    };
+
+    const updatedLog = [newLog, ...(userProfile.activityLog || [])].slice(
+      0,
+      50,
+    ); // keep last 50
+    const { id, ...data } = { ...userProfile, activityLog: updatedLog };
+    const payload = serializeStaff(id, data);
+    const { id: _removedId, ...updatePayload } = payload;
+
+    try {
+      await supabase.from("staff").update(updatePayload).eq("id", id);
+    } catch (e) {
+      console.error("Gagal mencatat log aktivitas:", e);
+    }
+  };
+
   // --- Handlers for Inventory ---
   const serializeInventory = (id: string, item: any) => {
-    const { name, category, status, assignedToId, assignedToName, purchaseDate, location, code, ...extra } = item;
+    const {
+      name,
+      category,
+      status,
+      assignedToId,
+      assignedToName,
+      purchaseDate,
+      location,
+      code,
+      ...extra
+    } = item;
     return {
       id,
-      name: name || 'Tanpa Nama',
-      category: category || 'Lainnya',
-      status: status || 'Tersedia',
+      name: name || "Tanpa Nama",
+      category: category || "Lainnya",
+      status: status || "Tersedia",
       assignedtoid: assignedToId || null,
       assignedtoname: assignedToName || null,
       purchasedate: purchaseDate || new Date().toISOString(),
-      location: location || 'Gudang',
-      serialnumber: code || '',
-      condition: 'Baik',
-      notes: JSON.stringify({ ...extra, code: code || '' })
+      location: location || "Gudang",
+      serialnumber: code || "",
+      condition: "Baik",
+      notes: JSON.stringify({ ...extra, code: code || "" }),
     };
   };
 
@@ -222,6 +380,10 @@ export default function App() {
         console.error("Supabase insert error:", error);
         throw error;
       }
+      logUserActivity(
+        "Menambahkan Inventaris",
+        `Menambahkan barang: ${item.name} (${item.category})`,
+      );
     } catch (e: any) {
       console.error(e);
       throw e;
@@ -241,7 +403,7 @@ export default function App() {
 
   const handleDeleteInventory = async (id: string) => {
     try {
-      setInventory(prev => prev.filter(i => i.id !== id));
+      setInventory((prev) => prev.filter((i) => i.id !== id));
       await supabase.from("inventory").delete().eq("id", id);
     } catch (e) {
       console.error(e);
@@ -250,17 +412,27 @@ export default function App() {
 
   // --- Handlers for Staff ---
   const serializeStaff = (id: string, profile: any) => {
-    const { name, role, department, status, email, phone, joinDate, leaveBalance, ...extra } = profile;
+    const {
+      name,
+      role,
+      department,
+      status,
+      email,
+      phone,
+      joinDate,
+      leaveBalance,
+      ...extra
+    } = profile;
     return {
       id,
-      name: name || 'Tanpa Nama',
-      position: role || 'Staf',
-      department: department || 'Umum',
-      status: status || 'Aktif',
-      contact: email || phone || '-',
-      startdate: joinDate || new Date().toISOString().split('T')[0],
+      name: name || "Tanpa Nama",
+      position: role || "Staf",
+      department: department || "Umum",
+      status: status || "Aktif",
+      contact: email || phone || "-",
+      startdate: joinDate || new Date().toISOString().split("T")[0],
       leavebalance: leaveBalance || 0,
-      notes: JSON.stringify({ ...extra, email, phone })
+      notes: JSON.stringify({ ...extra, role, email, phone }),
     };
   };
 
@@ -280,12 +452,17 @@ export default function App() {
       const payload = serializeStaff(id, data);
       const { id: _removedId, ...updatePayload } = payload;
       await supabase.from("staff").update(updatePayload).eq("id", id);
-      
-      const relatedInv = inventory.filter(item => item.assignedToId === id);
+
+      const relatedInv = inventory.filter((item) => item.assignedToId === id);
       if (relatedInv.length > 0) {
-        await Promise.all(relatedInv.map(item => 
-          supabase.from("inventory").update({ assignedtoname: updatedProfile.name }).eq("id", item.id)
-        ));
+        await Promise.all(
+          relatedInv.map((item) =>
+            supabase
+              .from("inventory")
+              .update({ assignedtoname: updatedProfile.name })
+              .eq("id", item.id),
+          ),
+        );
       }
     } catch (e) {
       console.error(e);
@@ -294,29 +471,117 @@ export default function App() {
 
   const handleDeleteStaff = async (id: string) => {
     try {
-      setStaff(prev => prev.filter(s => s.id !== id));
+      setStaff((prev) => prev.filter((s) => s.id !== id));
       await supabase.from("staff").delete().eq("id", id);
 
-      const relatedInv = inventory.filter(item => item.assignedToId === id);
+      const relatedInv = inventory.filter((item) => item.assignedToId === id);
       if (relatedInv.length > 0) {
-        await Promise.all(relatedInv.map(item => 
-          supabase.from("inventory").update({ assignedtoid: null, assignedtoname: null, status: "Tersedia" }).eq("id", item.id)
-        ));
+        await Promise.all(
+          relatedInv.map((item) =>
+            supabase
+              .from("inventory")
+              .update({
+                assignedtoid: null,
+                assignedtoname: null,
+                status: "Tersedia",
+              })
+              .eq("id", item.id),
+          ),
+        );
       }
 
-      const relatedLeaves = leaves.filter(l => l.staffId === id);
+      const relatedLeaves = leaves.filter((l) => l.staffId === id);
       if (relatedLeaves.length > 0) {
-        await Promise.all(relatedLeaves.map(l => 
-          supabase.from("leaves").delete().eq("id", l.id)
-        ));
+        await Promise.all(
+          relatedLeaves.map((l) =>
+            supabase.from("leaves").delete().eq("id", l.id),
+          ),
+        );
       }
     } catch (e) {
       console.error(e);
     }
   };
 
+  const handleUpdateRole = async (staffId: string, newRole: string, newJabatan?: string) => {
+    try {
+      const userProfile = staff.find((s) => s.id === staffId);
+      if (!userProfile) return;
+
+      const updatedProfile = {
+        ...userProfile,
+        role: newRole,
+        ...(newJabatan ? { jabatan: newJabatan } : {})
+      };
+
+      let department = userProfile.department || "SDM dan Umum";
+      if (newRole === "Kepala Pelaksana") {
+        department = "Kepala Pelaksana";
+      } else if (newRole.includes("Pendistribusian")) {
+        department = "Pendistribusian";
+      } else if (newRole.includes("Keuangan")) {
+        department = "Keuangan";
+      } else if (newRole.includes("Pengumpulan")) {
+        department = "Pengumpulan";
+      } else if (newRole.includes("Pendayagunaan")) {
+        department = "Pendayagunaan";
+      } else if (newRole.includes("SDM") || newRole.includes("Admin")) {
+        department = "SDM dan Umum";
+      } else {
+        department = newRole.replace("Staf ", "");
+      }
+
+      updatedProfile.department = department;
+
+      const { id, ...data } = updatedProfile;
+      const payload = serializeStaff(id, data);
+      const { id: _removedId, ...updatePayload } = payload;
+
+      await supabase
+        .from("staff")
+        .update(updatePayload)
+        .eq("id", staffId);
+    } catch (e) {
+      console.error("Gagal mengubah role:", e);
+    }
+  };
+
+  const handleUpdateStaffStatus = async (
+    staffId: string,
+    newStatus: string,
+  ) => {
+    try {
+      await supabase
+        .from("staff")
+        .update({ status: newStatus })
+        .eq("id", staffId);
+    } catch (e) {
+      console.error("Gagal mengubah status:", e);
+    }
+  };
+
+  const handleUpdatePermissions = async (
+    staffId: string,
+    permissions: string[],
+  ) => {
+    try {
+      const userProfile = staff.find((s) => s.id === staffId);
+      if (!userProfile) return;
+      const { id, ...data } = { ...userProfile, permissions };
+      const payload = serializeStaff(id, data);
+      const { id: _removedId, ...updatePayload } = payload;
+      await supabase.from("staff").update(updatePayload).eq("id", staffId);
+    } catch (e) {
+      console.error("Gagal mengubah hak akses spesifik:", e);
+    }
+  };
+
   // --- Handlers for Leaves ---
-  const serializeLeave = (id: string, req: Omit<LeaveRequest, "id" | "requestDate">, requestDate: string) => ({
+  const serializeLeave = (
+    id: string,
+    req: Omit<LeaveRequest, "id" | "requestDate">,
+    requestDate: string,
+  ) => ({
     id,
     staffid: req.staffId,
     staffname: req.staffName,
@@ -326,7 +591,7 @@ export default function App() {
     durationdays: req.durationDays,
     reason: req.reason,
     status: req.status,
-    requestdate: requestDate
+    requestdate: requestDate,
   });
 
   const handleAddLeaveRequest = async (
@@ -347,38 +612,66 @@ export default function App() {
     if (!req) return;
 
     try {
-      await supabase.from("leaves").update({ status: "Disetujui" }).eq("id", id);
+      await supabase
+        .from("leaves")
+        .update({ status: "Disetujui" })
+        .eq("id", id);
 
       const member = staff.find((s) => s.id === req.staffId);
       if (member) {
         const newBalance = Math.max(0, member.leaveBalance - req.durationDays);
-        await supabase.from("staff").update({
-          leavebalance: newBalance,
-          status: "Cuti",
-        }).eq("id", member.id);
+        await supabase
+          .from("staff")
+          .update({
+            leavebalance: newBalance,
+            status: "Cuti",
+          })
+          .eq("id", member.id);
       }
 
-      const relatedInv = inventory.filter(item => item.assignedToId === req.staffId);
+      const relatedInv = inventory.filter(
+        (item) => item.assignedToId === req.staffId,
+      );
       if (relatedInv.length > 0) {
-        await Promise.all(relatedInv.map(item => 
-          supabase.from("inventory").update({ assignedtoname: `${req.staffName} (Sedang Cuti)` }).eq("id", item.id)
-        ));
+        await Promise.all(
+          relatedInv.map((item) =>
+            supabase
+              .from("inventory")
+              .update({ assignedtoname: `${req.staffName} (Sedang Cuti)` })
+              .eq("id", item.id),
+          ),
+        );
       }
+      logUserActivity(
+        "Menyetujui Cuti",
+        `Menyetujui pengajuan cuti dari ${req.staffName}`,
+      );
     } catch (e) {
       console.error(e);
     }
   };
 
   const handleRejectLeave = async (id: string) => {
+    const req = leaves.find((l) => l.id === id);
+    if (!req) return;
+
     try {
       await supabase.from("leaves").update({ status: "Ditolak" }).eq("id", id);
+      logUserActivity(
+        "Menolak Cuti",
+        `Menolak pengajuan cuti dari ${req.staffName}`,
+      );
     } catch (e) {
       console.error(e);
     }
   };
 
   // --- Handlers for Documents ---
-  const serializeDocument = (id: string, doc: Omit<DocumentArchive, "id" | "uploadDate">, uploadDate: string) => ({
+  const serializeDocument = (
+    id: string,
+    doc: Omit<DocumentArchive, "id" | "uploadDate">,
+    uploadDate: string,
+  ) => ({
     id,
     name: doc.name,
     category: doc.category,
@@ -386,7 +679,7 @@ export default function App() {
     filesize: doc.fileSize,
     filetype: doc.fileType,
     description: doc.description || null,
-    tags: doc.tags ? JSON.stringify(doc.tags) : null
+    tags: doc.tags ? JSON.stringify(doc.tags) : null,
   });
 
   const handleAddDocument = async (
@@ -395,6 +688,11 @@ export default function App() {
     try {
       const newId = `DOC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
       const uploadDate = new Date().toISOString().split("T")[0];
+
+      if (docReq.fileUrl) {
+        EPHEMERAL_FILE_URLS[newId] = docReq.fileUrl;
+      }
+
       const payload = serializeDocument(newId, docReq, uploadDate);
       await supabase.from("documents").insert(payload);
     } catch (e) {
@@ -404,7 +702,7 @@ export default function App() {
 
   const handleDeleteDocument = async (id: string) => {
     try {
-      setDocuments(prev => prev.filter(d => d.id !== id));
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
       await supabase.from("documents").delete().eq("id", id);
     } catch (e) {
       console.error(e);
@@ -464,32 +762,50 @@ export default function App() {
 
         {/* Navigation list */}
         <nav className="flex-1 p-5 space-y-2 overflow-y-auto">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  setIsMobileSidebarOpen(false);
-                }}
-                className={`w-full flex items-center ${isSidebarCollapsed ? "justify-center px-1" : "space-x-4 px-5"} py-3.5 rounded-2xl text-[15px] font-semibold tracking-tight transition-all duration-300 ${
-                  isActive
-                    ? "bg-white text-blue-600 shadow-[0_4px_12px_rgba(0,0,0,0.06)] ring-1 ring-slate-100"
-                    : "text-slate-500 hover:text-slate-900 hover:bg-white/60"
-                }`}
-                title={item.label}
-              >
-                <Icon
-                  className={`w-5 h-5 shrink-0 ${isActive ? "text-blue-600" : "text-slate-400"}`}
-                />
-                {!isSidebarCollapsed && (
-                  <span className="truncate">{item.label}</span>
-                )}
-              </button>
-            );
-          })}
+          {navigationItems
+            .filter((item) => {
+              if (item.id === "user-management" || item.id === "settings") {
+                const role = currentUser?.user_metadata?.role || "";
+                return role === "Admin SDM dan Umum 1" || role === "Admin SDM dan Umum 2" || role === "Super Admin";
+              }
+              const userProfile = staff.find(
+                (s) => s.email === currentUser?.email,
+              );
+              if (
+                userProfile &&
+                userProfile.permissions &&
+                userProfile.permissions.length > 0
+              ) {
+                return userProfile.permissions.includes(item.id);
+              }
+              return true;
+            })
+            .map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center ${isSidebarCollapsed ? "justify-center px-1" : "space-x-4 px-5"} py-3.5 rounded-2xl text-[15px] font-semibold tracking-tight transition-all duration-300 ${
+                    isActive
+                      ? "bg-white text-blue-600 shadow-[0_4px_12px_rgba(0,0,0,0.06)] ring-1 ring-slate-100"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-white/60"
+                  }`}
+                  title={item.label}
+                >
+                  <Icon
+                    className={`w-5 h-5 shrink-0 ${isActive ? "text-blue-600" : "text-slate-400"}`}
+                  />
+                  {!isSidebarCollapsed && (
+                    <span className="truncate">{item.label}</span>
+                  )}
+                </button>
+              );
+            })}
         </nav>
 
         {/* Sidebar Footer Details */}
@@ -548,27 +864,45 @@ export default function App() {
 
               {/* Navigation list */}
               <nav className="flex-1 mt-4 space-y-2 overflow-y-auto">
-                {navigationItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setActiveTab(item.id);
-                        setIsMobileSidebarOpen(false);
-                      }}
-                      className={`w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl text-[15px] font-semibold tracking-tight transition-all duration-300 ${
-                        isActive
-                          ? "bg-blue-50/80 text-blue-600 shadow-sm ring-1 ring-blue-100"
-                          : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                      }`}
-                    >
-                      <Icon className="w-5 h-5 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                  );
-                })}
+                {navigationItems
+                  .filter((item) => {
+                    if (item.id === "user-management" || item.id === "settings") {
+                      const role = currentUser?.user_metadata?.role || "";
+                      return role === "Admin SDM dan Umum 1" || role === "Admin SDM dan Umum 2" || role === "Super Admin";
+                    }
+                    const userProfile = staff.find(
+                      (s) => s.email === currentUser?.email,
+                    );
+                    if (
+                      userProfile &&
+                      userProfile.permissions &&
+                      userProfile.permissions.length > 0
+                    ) {
+                      return userProfile.permissions.includes(item.id);
+                    }
+                    return true;
+                  })
+                  .map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setActiveTab(item.id);
+                          setIsMobileSidebarOpen(false);
+                        }}
+                        className={`w-full flex items-center space-x-4 px-4 py-3.5 rounded-2xl text-[15px] font-semibold tracking-tight transition-all duration-300 ${
+                          isActive
+                            ? "bg-blue-50/80 text-blue-600 shadow-sm ring-1 ring-blue-100"
+                            : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                        }`}
+                      >
+                        <Icon className="w-5 h-5 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
               </nav>
             </motion.aside>
           </div>
@@ -617,7 +951,10 @@ export default function App() {
                 <div className="relative">
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden shadow-lg shadow-blue-500/10 ring-2 ring-white group-hover:ring-blue-500/30 transition-all bg-gradient-to-br from-blue-50 to-indigo-50">
                     <img
-                      src={currentUser?.user_metadata?.avatar_url || "https://i.pravatar.cc/150"}
+                      src={
+                        currentUser?.user_metadata?.avatar_url ||
+                        "https://i.pravatar.cc/150"
+                      }
                       alt="User Profile"
                       className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-500"
                     />
@@ -665,7 +1002,8 @@ export default function App() {
                               {currentUser?.user_metadata?.full_name || "Admin"}
                             </span>
                             <span className="text-[10px] text-blue-300 font-mono tracking-widest uppercase">
-                              {currentUser?.user_metadata?.role || "Administrator"}
+                              {currentUser?.user_metadata?.role ||
+                                "Administrator"}
                             </span>
                           </div>
                         </div>
@@ -723,7 +1061,9 @@ export default function App() {
                   leaves={leaves}
                   documents={documents}
                   userName={
-                    currentUser?.user_metadata?.full_name || currentUser?.email || undefined
+                    currentUser?.user_metadata?.full_name ||
+                    currentUser?.email ||
+                    undefined
                   }
                   onNavigate={(tab) => setActiveTab(tab)}
                   onApproveLeave={handleApproveLeave}
@@ -749,6 +1089,8 @@ export default function App() {
                   onAddStaff={handleAddStaff}
                   onUpdateStaff={handleUpdateStaff}
                   onDeleteStaff={handleDeleteStaff}
+                  currentUserEmail={currentUser?.email || ""}
+                  currentUserRole={currentUser?.user_metadata?.role || "Staf"}
                 />
               )}
 
@@ -771,6 +1113,18 @@ export default function App() {
               )}
 
               {activeTab === "ai-assistant" && <AiAssistant />}
+
+              {activeTab === "user-management" && (
+                <UserManagement
+                  staff={staff}
+                  leaves={leaves}
+                  currentUserRole={currentUser?.user_metadata?.role || "Staf"}
+                  onUpdateRole={handleUpdateRole}
+                  onUpdateStatus={handleUpdateStaffStatus}
+                  onUpdatePermissions={handleUpdatePermissions}
+                  onDeleteStaff={handleDeleteStaff}
+                />
+              )}
 
               {activeTab === "settings" && <Settings />}
             </motion.div>

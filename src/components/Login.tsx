@@ -11,20 +11,29 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("Staf Pendistribusian");
-  const [takenAdminRoles, setTakenAdminRoles] = useState<string[]>([]);
+  const [takenRoles, setTakenRoles] = useState<string[]>([]);
 
   useEffect(() => {
-    const fetchAdmins = async () => {
+    const fetchTakenRoles = async () => {
       const { data } = await supabase
         .from("staff")
-        .select("position")
-        .ilike("position", "%Admin SDM dan Umum%");
+        .select("position");
       if (data) {
-        setTakenAdminRoles(data.map(d => d.position));
+        setTakenRoles(data.map(d => d.position));
       }
     };
-    fetchAdmins();
+    fetchTakenRoles();
   }, []);
+
+  const getDepartmentForRole = (roleName: string): string => {
+    if (roleName === "Kepala Pelaksana") return "Kepala Pelaksana";
+    if (roleName.includes("Pendistribusian")) return "Pendistribusian";
+    if (roleName.includes("Keuangan")) return "Keuangan";
+    if (roleName.includes("Pengumpulan")) return "Pengumpulan";
+    if (roleName.includes("Pendayagunaan")) return "Pendayagunaan";
+    if (roleName.includes("SDM") || roleName.includes("Admin")) return "SDM dan Umum";
+    return "SDM dan Umum"; // fallback
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +58,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
             id: `STF-${Date.now()}`,
             name: fullName,
             position: role,
-            department: role.includes("Admin") ? "SDM dan Umum" : role.replace("Staf ", ""),
+            department: getDepartmentForRole(role),
             contact: email,
             status: "Aktif",
             startdate: new Date().toISOString().split("T")[0],
@@ -149,11 +158,26 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none"
                       required={isSignUp}
                     >
-                      {!takenAdminRoles.includes("Admin SDM dan Umum 1") && (
+                      {!takenRoles.includes("Admin SDM dan Umum 1") && (
                         <option value="Admin SDM dan Umum 1" className="bg-[#020817]">Admin SDM dan Umum 1</option>
                       )}
-                      {!takenAdminRoles.includes("Admin SDM dan Umum 2") && (
+                      {!takenRoles.includes("Admin SDM dan Umum 2") && (
                         <option value="Admin SDM dan Umum 2" className="bg-[#020817]">Admin SDM dan Umum 2</option>
+                      )}
+                      {!takenRoles.includes("Kepala Pelaksana") && (
+                        <option value="Kepala Pelaksana" className="bg-[#020817]">Kepala Pelaksana</option>
+                      )}
+                      {!takenRoles.includes("Kepala Bidang Pendistribusian") && (
+                        <option value="Kepala Bidang Pendistribusian" className="bg-[#020817]">Kepala Bidang Pendistribusian</option>
+                      )}
+                      {!takenRoles.includes("Kepala Bagian Keuangan") && (
+                        <option value="Kepala Bagian Keuangan" className="bg-[#020817]">Kepala Bagian Keuangan</option>
+                      )}
+                      {!takenRoles.includes("Kepala Bagian Pengumpulan") && (
+                        <option value="Kepala Bagian Pengumpulan" className="bg-[#020817]">Kepala Bagian Pengumpulan</option>
+                      )}
+                      {!takenRoles.includes("Kepala Sub Bidang Pendayagunaan") && (
+                        <option value="Kepala Sub Bidang Pendayagunaan" className="bg-[#020817]">Kepala Sub Bidang Pendayagunaan</option>
                       )}
                       <option value="Staf Pendistribusian" className="bg-[#020817]">Staf Pendistribusian</option>
                       <option value="Staf Pengumpulan" className="bg-[#020817]">Staf Pengumpulan</option>

@@ -31,6 +31,7 @@ export default function Leave({
 
   // Submit Modal States
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
+  const [leaveToConfirm, setLeaveToConfirm] = useState<{staff: StaffProfile, days: number} | null>(null);
 
   // Form States
   const [formData, setFormData] = useState({
@@ -42,7 +43,19 @@ export default function Leave({
   });
 
   // Calculate leaves statistics
-  const totalOnLeave = staff.filter((s) => s.status === "Cuti").length;
+  const today = new Date().toISOString().split("T")[0];
+  const totalOnLeave = Array.from(
+    new Set(
+      leaves
+        .filter(
+          (l) =>
+            l.status === "Disetujui" &&
+            l.startDate <= today &&
+            l.endDate >= today
+        )
+        .map((l) => l.staffId)
+    )
+  ).length;
   const totalPending = leaves.filter((l) => l.status === "Pending").length;
 
   const handleOpenRequest = () => {
@@ -68,27 +81,9 @@ export default function Leave({
     return diffDays;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.staffId || !formData.reason) return;
-
+  const submitLeave = () => {
     const durationDays = calculateDays(formData.startDate, formData.endDate);
     const selectedStaff = staff.find((s) => s.id === formData.staffId);
-
-    // Check if leave balance is sufficient (Optional warning, but let them file it anyway)
-    if (
-      selectedStaff &&
-      formData.leaveType === "Cuti Tahunan" &&
-      selectedStaff.leaveBalance < durationDays
-    ) {
-      if (
-        !confirm(
-          `Peringatan: Jatah Cuti Tahunan tinggal ${selectedStaff.leaveBalance} hari. Durasi pengajuan adalah ${durationDays} hari. Lanjutkan pengajuan?`,
-        )
-      ) {
-        return;
-      }
-    }
 
     onAddLeaveRequest({
       staffId: formData.staffId,
@@ -102,6 +97,26 @@ export default function Leave({
     });
 
     setIsSubmitOpen(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.staffId || !formData.reason) return;
+
+    const durationDays = calculateDays(formData.startDate, formData.endDate);
+    const selectedStaff = staff.find((s) => s.id === formData.staffId);
+
+    // Check if leave balance is sufficient (Optional warning, but let them file it anyway)
+    if (
+      selectedStaff &&
+      formData.leaveType === "Cuti Tahunan" &&
+      selectedStaff.leaveBalance < durationDays
+    ) {
+      setLeaveToConfirm({ staff: selectedStaff, days: durationDays });
+      return;
+    }
+
+    submitLeave();
   };
 
   // Filter Leave requests list
@@ -130,7 +145,7 @@ export default function Leave({
               <span className="text-amber-700 font-bold text-sm">Staff</span>
             </div>
             <p className="text-[11px] text-amber-600 mt-1">
-              Berdasarkan status keaktifan live
+              Berdasarkan cuti berjalan hari ini
             </p>
           </div>
         </div>
@@ -547,6 +562,34 @@ export default function Leave({
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {leaveToConfirm && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-100 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150 p-6 flex flex-col space-y-4">
+            <h3 className="font-bold text-slate-800 text-lg">Konfirmasi Pengajuan</h3>
+            <p className="text-sm text-slate-600">
+              Peringatan: Jatah Cuti Tahunan tinggal {leaveToConfirm.staff.leaveBalance} hari. Durasi pengajuan adalah {leaveToConfirm.days} hari. Lanjutkan pengajuan?
+            </p>
+            <div className="flex items-center justify-end space-x-3 pt-4">
+              <button
+                onClick={() => setLeaveToConfirm(null)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg text-sm hover:bg-slate-200 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  submitLeave();
+                  setLeaveToConfirm(null);
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg text-sm hover:bg-indigo-700 transition-colors"
+              >
+                Ya, Lanjutkan
+              </button>
+            </div>
           </div>
         </div>
       )}

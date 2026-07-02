@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { StaffProfile, InventoryItem, LeaveRequest } from "../types";
+import { supabase } from "../supabase";
+import Swal from "sweetalert2";
 import {
   Plus,
   Search,
@@ -14,6 +16,8 @@ import {
   Edit2,
   Trash2,
   Award,
+  User,
+  Upload,
 } from "lucide-react";
 
 interface StaffProps {
@@ -23,6 +27,8 @@ interface StaffProps {
   onAddStaff: (profile: Omit<StaffProfile, "id">) => void;
   onUpdateStaff: (profile: StaffProfile) => void;
   onDeleteStaff: (id: string) => void;
+  currentUserEmail?: string;
+  currentUserRole?: string;
 }
 
 export default function Staff({
@@ -32,10 +38,12 @@ export default function Staff({
   onAddStaff,
   onUpdateStaff,
   onDeleteStaff,
+  currentUserEmail = "",
+  currentUserRole = "Staf",
 }: StaffProps) {
   // Search and Filter States
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDept, setSelectedDept] = useState("Semua");
+  const [selectedDept, setSelectedDept] = useState("Semua Bidang");
   const [selectedStatus, setSelectedStatus] = useState("Semua");
 
   // Modal control States
@@ -45,6 +53,7 @@ export default function Staff({
 
   // Form & Selection states
   const [currentStaff, setCurrentStaff] = useState<StaffProfile | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState({
     employeeId: "",
     name: "",
@@ -52,44 +61,159 @@ export default function Staff({
     address: "",
     education: "",
     trainingHistory: "",
-    role: "",
-    department: "Human Resources",
+    role: "Staf",
+    jabatan: "Staf",
+    department: "SDM dan Umum",
     email: "",
     phone: "",
     status: "Aktif" as const,
     joinDate: new Date().toISOString().split("T")[0],
     leaveBalance: 12,
     specialLeaveBalance: 12,
+    avatarUrl: "",
   });
 
-  // Department choices extracted dynamically + 'Semua'
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+
+    Swal.fire({
+      toast: true,
+      position: "bottom-end",
+      title: "Mengunggah Foto...",
+      html: "Menyiapkan pengunggahan foto...",
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
+    try {
+      const fileExt = file.name.split(".").pop() || "";
+      const fileName = `AVATAR-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Create documents bucket if it doesn't exist
+      try {
+        await supabase.storage.createBucket("documents", { public: true });
+      } catch (err) {}
+
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("documents").getPublicUrl(filePath);
+      const publicUrl = data.publicUrl;
+
+      setFormData((prev) => ({ ...prev, avatarUrl: publicUrl }));
+
+      Swal.fire({
+        toast: true,
+        position: "bottom-end",
+        icon: "success",
+        title: "Foto berhasil diunggah",
+        text: "Foto profil telah diperbarui.",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.warn("Gagal mengunggah ke Supabase, menggunakan Base64 lokal:", error);
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setFormData((prev) => ({ ...prev, avatarUrl: base64String }));
+
+        Swal.fire({
+          toast: true,
+          position: "bottom-end",
+          icon: "success",
+          title: "Foto berhasil dimuat",
+          text: "Foto profil lokal telah dimuat.",
+          timer: 3000,
+          showConfirmButton: false,
+        });
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Department/Bidang choices
   const departments = [
-    "Semua",
-    "Human Resources",
-    "IT & Infrastructure",
-    "Finance & Accounting",
-    "Engineering",
-    "General Affairs",
-    "Pemasaran & Penjualan",
+    "Semua Bidang",
+    "Kepala Pelaksana",
+    "SDM dan Umum",
+    "Pengumpulan",
+    "Pendistribusian",
+    "Pendayagunaan",
+    "Keuangan",
   ];
   const formDepartments = [
-    "Human Resources",
-    "IT & Infrastructure",
-    "Finance & Accounting",
-    "Engineering",
-    "General Affairs",
-    "Pemasaran & Penjualan",
+    "Kepala Pelaksana",
+    "SDM dan Umum",
+    "Pengumpulan",
+    "Pendistribusian",
+    "Pendayagunaan",
+    "Keuangan",
+  ];
+  const formRoles = [
+    "Kepala Pelaksana",
+    "Kepala Bidang",
+    "Kepala Bagian",
+    "Kepala Sub Bidang",
+    "Staf",
+  ];
+  const formPeran = [
+    "Super Admin",
+    "Admin SDM dan Umum 1",
+    "Admin SDM dan Umum 2",
+    "Staf SDM dan Umum",
+    "Staf Pendistribusian",
+    "Staf Pengumpulan",
+    "Staf Keuangan",
+    "Kepala Pelaksana",
+    "Kepala Bidang Pendistribusian",
+    "Kepala Bagian Keuangan",
+    "Kepala Bagian Pengumpulan",
+    "Kepala Sub Bidang Pendayagunaan",
   ];
 
+  const isSystemAdmin =
+    currentUserRole === "Admin SDM dan Umum 1" ||
+    currentUserRole === "Admin SDM dan Umum 2" ||
+    currentUserRole === "Super Admin";
+
+  const today = new Date().toISOString().split("T")[0];
+  const computedStaff: StaffProfile[] = staff.map((member) => {
+    if (member.status === "Nonaktif") return member;
+    const isCurrentlyOnLeave = leaves.some(
+      (l) =>
+        l.staffId === member.id &&
+        l.status === "Disetujui" &&
+        l.startDate <= today &&
+        l.endDate >= today
+    );
+    return { ...member, status: isCurrentlyOnLeave ? "Cuti" : "Aktif" };
+  });
+
   // Filter staff Profiles
-  const filteredStaff = staff.filter((member) => {
+  const filteredStaff = computedStaff.filter((member) => {
+    // Sembunyikan Super Admin
+    if (member.role === "Super Admin") return false;
+
     const matchesSearch =
       member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesDept =
-      selectedDept === "Semua" || member.department === selectedDept;
+      selectedDept === "Semua Bidang" || member.department === selectedDept;
     const matchesStatus =
       selectedStatus === "Semua" || member.status === selectedStatus;
 
@@ -104,14 +228,16 @@ export default function Staff({
       address: "",
       education: "",
       trainingHistory: "",
-      role: "",
-      department: "Engineering",
+      role: "Staf SDM dan Umum",
+      jabatan: "Staf",
+      department: "SDM dan Umum",
       email: "",
       phone: "",
       status: "Aktif",
       joinDate: new Date().toISOString().split("T")[0],
       leaveBalance: 12,
       specialLeaveBalance: 12,
+      avatarUrl: "",
     });
     setIsAddOpen(true);
   };
@@ -121,26 +247,50 @@ export default function Staff({
     if (!formData.name || !formData.email) return;
     onAddStaff(formData);
     setIsAddOpen(false);
+    Swal.fire({
+      toast: true,
+      position: "bottom-end",
+      icon: "success",
+      title: "Berhasil didaftarkan",
+      text: "Staf baru berhasil didaftarkan.",
+      timer: 3000,
+      showConfirmButton: false,
+    });
   };
 
   const handleOpenEdit = (member: StaffProfile, e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering card details modal
     setCurrentStaff(member);
+    
+    let defaultJabatan = "Staf";
+    const rawRole = member.role || "Staf";
+    if (rawRole === "Kepala Pelaksana") {
+      defaultJabatan = "Kepala Pelaksana";
+    } else if (rawRole.startsWith("Kepala Bidang")) {
+      defaultJabatan = "Kepala Bidang";
+    } else if (rawRole.startsWith("Kepala Bagian")) {
+      defaultJabatan = "Kepala Bagian";
+    } else if (rawRole.startsWith("Kepala Sub Bidang")) {
+      defaultJabatan = "Kepala Sub Bidang";
+    }
+
     setFormData({
       employeeId: member.employeeId || "",
-      name: member.name,
+      name: member.name || "",
       birthPlaceAndDate: member.birthPlaceAndDate || "",
       address: member.address || "",
       education: member.education || "",
       trainingHistory: member.trainingHistory || "",
-      role: member.role,
-      department: member.department,
-      email: member.email,
-      phone: member.phone,
-      status: member.status,
-      joinDate: member.joinDate,
-      leaveBalance: member.leaveBalance,
-      specialLeaveBalance: member.specialLeaveBalance || 12,
+      role: member.role || "Staf",
+      jabatan: member.jabatan || defaultJabatan,
+      department: member.department || "SDM dan Umum",
+      email: member.email || "",
+      phone: member.phone || "",
+      status: member.status || "Aktif",
+      joinDate: member.joinDate || "",
+      leaveBalance: member.leaveBalance || 0,
+      specialLeaveBalance: member.specialLeaveBalance || 0,
+      avatarUrl: member.avatarUrl || "",
     });
     setIsEditOpen(true);
   };
@@ -153,6 +303,41 @@ export default function Staff({
       ...formData,
     });
     setIsEditOpen(false);
+    Swal.fire({
+      toast: true,
+      position: "bottom-end",
+      icon: "success",
+      title: "Berhasil diperbarui",
+      text: "Data profil staf berhasil diperbarui.",
+      timer: 3000,
+      showConfirmButton: false,
+    });
+  };
+
+  const handleConfirmDelete = (member: StaffProfile) => {
+    Swal.fire({
+      title: "Konfirmasi Hapus",
+      text: `Apakah Anda yakin ingin menghapus profil staf ${member.name}? Tindakan ini tidak dapat dibatalkan.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Ya, Hapus",
+      cancelButtonText: "Batal",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        onDeleteStaff(member.id);
+        Swal.fire({
+          toast: true,
+          position: "bottom-end",
+          icon: "success",
+          title: "Berhasil dihapus",
+          text: "Data staf berhasil dihapus dari sistem.",
+          timer: 3000,
+          showConfirmButton: false,
+        });
+      }
+    });
   };
 
   const handleOpenDetails = (member: StaffProfile) => {
@@ -184,13 +369,15 @@ export default function Staff({
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAdd}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg inline-flex items-center space-x-2 transition-all transition-transform hover:-translate-y-0.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Staf</span>
-        </button>
+        {isSystemAdmin && (
+          <button
+            onClick={handleOpenAdd}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg inline-flex items-center space-x-2 transition-all transition-transform hover:-translate-y-0.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Staf</span>
+          </button>
+        )}
       </div>
 
       {/* Filter and Search Bar Section */}
@@ -218,7 +405,7 @@ export default function Staff({
             >
               {departments.map((dept) => (
                 <option key={dept} value={dept}>
-                  {dept === "Semua" ? "Semua Departemen" : dept}
+                  {dept}
                 </option>
               ))}
             </select>
@@ -301,31 +488,42 @@ export default function Staff({
                           <h3 className="font-bold text-slate-800 text-lg leading-tight line-clamp-2">
                             {member.name}
                           </h3>
-                          <p className="text-sm text-slate-500 font-medium mt-0.5">
-                            {member.role || "Staf"}
-                          </p>
+                          <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1.5 items-center">
+                            <span className="text-xs text-slate-600 font-semibold bg-slate-100 px-2 py-0.5 rounded">
+                              {member.jabatan || "Staf"}
+                            </span>
+                            {member.role && (member.role.toLowerCase().includes("admin") || member.role.toLowerCase().includes("super")) && (
+                              <span className="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded-md">
+                                {member.role}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       {/* Actions */}
                       <div className="flex space-x-2 text-slate-400">
-                        <button
-                          onClick={(e) => handleOpenEdit(member, e)}
-                          className="hover:text-indigo-600 transition-colors p-1"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm(`Hapus profil staf ${member.name}?`)) {
-                              onDeleteStaff(member.id);
-                            }
-                          }}
-                          className="hover:text-rose-500 transition-colors p-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {(isSystemAdmin || (member.email && currentUserEmail && member.email.toLowerCase() === currentUserEmail.toLowerCase())) && (
+                          <button
+                            onClick={(e) => handleOpenEdit(member, e)}
+                            className="hover:text-indigo-600 transition-colors p-1"
+                            title="Edit Profil"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {isSystemAdmin && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleConfirmDelete(member);
+                            }}
+                            className="hover:text-rose-500 transition-colors p-1"
+                            title="Hapus Staf"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -612,22 +810,48 @@ export default function Staff({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">
-                    Jabatan / Role
+                    Peran Sistem (Akses Level)
                   </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: QA Engineer"
+                  <select
                     value={formData.role}
                     onChange={(e) =>
                       setFormData({ ...formData, role: e.target.value })
                     }
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
-                  />
+                  >
+                    {formPeran
+                      .filter((p) => p !== "Super Admin" || formData.role === "Super Admin")
+                      .map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">
-                    Departemen
+                    Jabatan Struktur
+                  </label>
+                  <select
+                    value={formData.jabatan}
+                    onChange={(e) =>
+                      setFormData({ ...formData, jabatan: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+                  >
+                    {formRoles.map((roleOpt) => (
+                      <option key={roleOpt} value={roleOpt}>
+                        {roleOpt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Bidang
                   </label>
                   <select
                     value={formData.department}
@@ -859,46 +1083,102 @@ export default function Staff({
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">
-                  URL Foto Resolusi Tinggi (Opsional)
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 block">
+                  Foto Profil
                 </label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={formData.avatarUrl || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, avatarUrl: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-mono"
-                />
+                <div className="flex items-center space-x-4 border border-slate-100 rounded-xl p-3 bg-slate-50">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 shadow-sm border border-slate-200 bg-white flex items-center justify-center">
+                    {formData.avatarUrl ? (
+                      <img
+                        src={formData.avatarUrl}
+                        alt="Pratinjau Foto"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-8 h-8 text-slate-300" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="edit-avatar-upload"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={isUploading}
+                    />
+                    <label
+                      htmlFor="edit-avatar-upload"
+                      className={`inline-flex items-center space-x-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-50 cursor-pointer transition-colors ${
+                        isUploading ? "opacity-50 pointer-events-none" : ""
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>{isUploading ? "Mengunggah..." : "Unggah Foto Baru"}</span>
+                    </label>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Mendukung format JPG, PNG, GIF, atau WebP.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">
-                    Jabatan
+                    Peran Sistem (Akses Level)
                   </label>
-                  <input
-                    type="text"
-                    required
+                  <select
                     value={formData.role}
+                    disabled={!isSystemAdmin}
                     onChange={(e) =>
                       setFormData({ ...formData, role: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
-                  />
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
+                  >
+                    {formPeran
+                      .filter((p) => p !== "Super Admin" || formData.role === "Super Admin")
+                      .map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">
-                    Departemen
+                    Jabatan Struktur
+                  </label>
+                  <select
+                    value={formData.jabatan}
+                    disabled={!isSystemAdmin}
+                    onChange={(e) =>
+                      setFormData({ ...formData, jabatan: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
+                  >
+                    {formRoles.map((roleOpt) => (
+                      <option key={roleOpt} value={roleOpt}>
+                        {roleOpt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Bidang
                   </label>
                   <select
                     value={formData.department}
+                    disabled={!isSystemAdmin}
                     onChange={(e) =>
                       setFormData({ ...formData, department: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 font-sans"
                   >
                     {formDepartments.map((dept) => (
                       <option key={dept} value={dept}>
@@ -973,37 +1253,51 @@ export default function Staff({
                   />
                 </div>
                 <div className="col-span-1 space-y-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    Sisa Kuota Cuti Tahunan
+                  <label className={`text-xs font-bold ${isSystemAdmin ? "text-slate-700" : "text-slate-500"}`}>
+                    Kuota Cuti Tahun
                   </label>
                   <input
                     type="number"
                     min="0"
+                    readOnly={!isSystemAdmin}
                     value={formData.leaveBalance}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        leaveBalance: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+                    onChange={(e) => {
+                      if (isSystemAdmin) {
+                        setFormData({
+                          ...formData,
+                          leaveBalance: parseInt(e.target.value) || 0,
+                        });
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-sans ${
+                      isSystemAdmin
+                        ? "bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden transition-all"
+                        : "bg-slate-100 text-slate-500 cursor-not-allowed font-medium"
+                    }`}
                   />
                 </div>
                 <div className="col-span-1 space-y-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    Sisa Kuota Cuti Khusus
+                  <label className={`text-xs font-bold ${isSystemAdmin ? "text-slate-700" : "text-slate-500"}`}>
+                    Kuota Cuti Khusus
                   </label>
                   <input
                     type="number"
                     min="0"
-                    value={formData.specialLeaveBalance}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        specialLeaveBalance: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+                    readOnly={!isSystemAdmin}
+                    value={formData.specialLeaveBalance !== undefined ? formData.specialLeaveBalance : 12}
+                    onChange={(e) => {
+                      if (isSystemAdmin) {
+                        setFormData({
+                          ...formData,
+                          specialLeaveBalance: parseInt(e.target.value) || 0,
+                        });
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-sans ${
+                      isSystemAdmin
+                        ? "bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden transition-all"
+                        : "bg-slate-100 text-slate-500 cursor-not-allowed font-medium"
+                    }`}
                   />
                 </div>
               </div>
@@ -1098,7 +1392,13 @@ export default function Staff({
                       </strong>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">Jabatan Fungsional</span>
+                      <span className="text-slate-500">Jabatan Struktur</span>
+                      <strong className="text-slate-800 font-semibold">
+                        {currentStaff.jabatan || "Staf"}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-500">Peran Sistem (Akses Level)</span>
                       <strong className="text-slate-800 font-semibold">
                         {currentStaff.role}
                       </strong>
@@ -1329,6 +1629,7 @@ export default function Staff({
           </div>
         </div>
       )}
+
     </div>
   );
 }

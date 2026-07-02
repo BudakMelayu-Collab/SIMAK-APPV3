@@ -64,3 +64,17 @@ ALTER TABLE public.staff DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inventory DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leaves DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documents DISABLE ROW LEVEL SECURITY;
+
+-- Storage Bucket for Documents
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('documents', 'documents', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage Policies for Documents Bucket (Allow public access for this applet)
+CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'documents');
+CREATE POLICY "Public Insert" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'documents');
+CREATE POLICY "Public Update" ON storage.objects FOR UPDATE USING (bucket_id = 'documents');
+CREATE POLICY "Public Delete" ON storage.objects FOR DELETE USING (bucket_id = 'documents');
+
+-- Disable RLS on storage.objects for easier testing (Optional, use with caution in production)
+-- ALTER TABLE storage.objects DISABLE ROW LEVEL SECURITY;
